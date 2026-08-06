@@ -4,6 +4,7 @@
   "description": "Open source status page that runs on Cloudflare Workers + D1",
   "license": "MIT",
   "type": "module",
+  "packageManager": "pnpm@11.10.0",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",

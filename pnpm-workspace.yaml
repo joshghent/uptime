@@ -1,3 +1,8 @@
+# miniflare pins an undici with two open advisories. Dev-only — it never
+# reaches the deployed Worker — but there is no reason to keep it.
+overrides:
+  undici: ">=7.29.0"
+
 # esbuild and workerd download platform binaries in a postinstall script.
 allowBuilds:
   esbuild: true
