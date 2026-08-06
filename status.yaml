@@ -7,7 +7,7 @@
 #   npx wrangler secret put NTFY_URL
 
 title: Turbo Technologies Status
-description: Live availability for everything we run.
+description: Live availability for Plan Pacer, RepoWarden and LoginLlama.
 link: https://turbotechnologies.co
 
 # Days of raw check results to keep. The 90-day bars come from daily rollups,
@@ -30,38 +30,50 @@ notify:
   #     x-signature: ${WEBHOOK_SECRET}
 
 monitors:
-  - name: Website
-    url: https://turbotechnologies.co
-    description: Marketing site and docs
+  - name: Plan Pacer
+    url: https://planpacer.com
+    description: Marketing site and checkout
 
-  - name: API
-    url: https://api.turbotechnologies.co/health
-    description: Public REST API
-    interval: 1m
-    expect_status: [200]
-    expect_body: '"status":"ok"'
-    degraded_ms: 800
-    # Two things can trip an alarm. With both set, whichever fires first wins.
-    failures_before_alarm: 2
+  - name: Plan Pacer API
+    url: https://planpacer.com/api/health
+    description: API and database
+    # The endpoint reports on its D1 connection, so this checks the database
+    # too rather than just that the Worker is up.
+    expect_body: '"database":"connected"'
+    degraded_ms: 1500
     failing_for: 5m
 
-  - name: Checkout
-    url: https://app.turbotechnologies.co/api/health
-    method: GET
-    headers:
-      user-agent: turbo-uptime
-    # Page this one somewhere louder than the rest.
-    notify:
-      ntfy: ${NTFY_CRITICAL_URL}
+  - name: RepoWarden
+    url: https://repowarden.dev
+    description: Web app
+
+  - name: RepoWarden API
+    url: https://api.repowarden.dev/api/health
+    description: API workers
+    expect_body: '"status":"ok"'
+    degraded_ms: 1500
+    failing_for: 5m
+
+  - name: LoginLlama
+    url: https://loginllama.app
+    description: Web app and dashboard
+
+  - name: LoginLlama API
+    url: https://loginllama.app/api/health
+    description: Login-check API
+    expect_body: '"status":"ok"'
+    degraded_ms: 1500
+    failing_for: 5m
 
   # A heartbeat monitor has no URL. The job calls
-  #   https://<your-worker>/ping/nightly-backup?token=...
-  # and goes into alarm when a ping does not arrive in time.
-  - name: Nightly backup
+  #   https://uptime.<subdomain>.workers.dev/ping/repowarden-daily-scan?token=...
+  # when it finishes, and goes into alarm when a ping does not arrive in time.
+  # Until the first ping arrives this monitor records nothing and never alerts,
+  # so it is safe to leave here while the cron is being wired up.
+  - name: RepoWarden daily scan
     type: heartbeat
-    id: nightly-backup
-    description: Cron job on the database host
+    id: repowarden-daily-scan
+    description: Nightly repository scan cron
     period: 24h
-    grace: 1h
-    interval: 5m
+    grace: 2h
     token: ${HEARTBEAT_TOKEN}

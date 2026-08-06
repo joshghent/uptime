@@ -11,7 +11,6 @@ export default defineConfig({
           TEST_MIGRATIONS: await readD1Migrations(path.join(import.meta.dirname, "migrations")),
           // status.yaml interpolates these; without them the config is invalid.
           NTFY_URL: "https://ntfy.test/alerts",
-          NTFY_CRITICAL_URL: "https://ntfy.test/critical",
           HEARTBEAT_TOKEN: "test-token",
         },
       },

@@ -1,6 +1,15 @@
 import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { loadConfig } from "../src/config.ts";
 import worker from "../src/index.ts";
+import source from "../status.yaml";
+
+// Asserted against the real shipped config, so editing status.yaml cannot
+// silently break the page without a test noticing.
+const config = loadConfig(source, env as unknown as Record<string, unknown>);
+const heartbeat = config.monitors.find((m) => m.type === "heartbeat");
+const http = config.monitors.find((m) => m.type === "http")!;
+if (!heartbeat || heartbeat.type !== "heartbeat") throw new Error("status.yaml needs a heartbeat monitor");
 
 const get = async (path: string, init?: RequestInit) => {
   const ctx = createExecutionContext();
@@ -23,17 +32,17 @@ describe("GET /", () => {
     expect(res.headers.get("content-type")).toMatch(/text\/html/);
 
     const html = await res.text();
-    expect(html).toContain("Turbo Technologies Status");
-    for (const name of ["Website", "API", "Checkout", "Nightly backup"]) expect(html).toContain(name);
+    expect(html).toContain(config.title);
+    for (const m of config.monitors) expect(html).toContain(m.name);
     // 90 day bars per monitor, all grey before any check has run.
-    expect(html.match(/class="bar--none"/g)).toHaveLength(4 * 90);
+    expect(html.match(/class="bar--none"/g)).toHaveLength(config.monitors.length * 90);
     expect(html).toContain("Waiting for the first check");
   });
 
   it("shows an incident banner while a monitor is down", async () => {
     const now = Math.floor(Date.now() / 1000);
     await env.DB.prepare("INSERT INTO incidents (monitor, started_at, reason) VALUES (?, ?, ?)")
-      .bind("api", now - 600, "unexpected status 503")
+      .bind(http.id, now - 600, "unexpected status 503")
       .run();
 
     const html = await get("/").then((r) => r.text());
@@ -44,7 +53,7 @@ describe("GET /", () => {
 
   it("escapes values that come from the config and the database", async () => {
     await env.DB.prepare("INSERT INTO incidents (monitor, started_at, reason) VALUES (?, ?, ?)")
-      .bind("api", 1, "<script>alert(1)</script>")
+      .bind(http.id, 1, "<script>alert(1)</script>")
       .run();
     const html = await get("/").then((r) => r.text());
     expect(html).not.toContain("<script>alert(1)</script>");
@@ -61,34 +70,35 @@ describe("GET /api/status", () => {
     const body = (await res.json()) as { monitors: unknown[]; overall: string; windowDays: number };
     expect(body.windowDays).toBe(90);
     expect(body.overall).toBe("unknown");
-    expect(body.monitors).toHaveLength(4);
-    expect(body.monitors[0]).toMatchObject({ id: "website", name: "Website", uptime: null });
+    expect(body.monitors).toHaveLength(config.monitors.length);
+    expect(body.monitors[0]).toMatchObject({ id: http.id, name: http.name, uptime: null });
   });
 });
 
 describe("GET /ping/:id", () => {
+  const token = heartbeat.token!;
+  const lastPing = () =>
+    env.DB.prepare("SELECT last_ping FROM heartbeats WHERE monitor = ?").bind(heartbeat.id).first();
+
   it("records a ping when the token matches", async () => {
-    const res = await get("/ping/nightly-backup?token=test-token");
-    expect(res.status).toBe(200);
-    const row = await env.DB.prepare("SELECT last_ping FROM heartbeats WHERE monitor = 'nightly-backup'").first();
-    expect(row).not.toBeNull();
+    expect((await get(`/ping/${heartbeat.id}?token=${token}`)).status).toBe(200);
+    expect(await lastPing()).not.toBeNull();
   });
 
   it("accepts the token as a bearer header", async () => {
-    const res = await get("/ping/nightly-backup", { headers: { authorization: "Bearer test-token" } });
+    const res = await get(`/ping/${heartbeat.id}`, { headers: { authorization: `Bearer ${token}` } });
     expect(res.status).toBe(200);
   });
 
   it("rejects a missing or wrong token", async () => {
-    expect((await get("/ping/nightly-backup")).status).toBe(401);
-    expect((await get("/ping/nightly-backup?token=nope")).status).toBe(401);
-    const row = await env.DB.prepare("SELECT last_ping FROM heartbeats WHERE monitor = 'nightly-backup'").first();
-    expect(row).toBeNull();
+    expect((await get(`/ping/${heartbeat.id}`)).status).toBe(401);
+    expect((await get(`/ping/${heartbeat.id}?token=nope`)).status).toBe(401);
+    expect(await lastPing()).toBeNull();
   });
 
   it("404s for an unknown id and for an HTTP monitor", async () => {
     expect((await get("/ping/nope")).status).toBe(404);
-    expect((await get("/ping/website")).status).toBe(404);
+    expect((await get(`/ping/${http.id}`)).status).toBe(404);
   });
 });
 
@@ -106,10 +116,12 @@ describe("scheduled", () => {
     await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.now() } as ScheduledController, env, ctx);
     await waitOnExecutionContext(ctx);
 
-    // The heartbeat has never been pinged, so only the three HTTP monitors ran.
+    // Heartbeats that have never been pinged record nothing, so only the HTTP
+    // monitors show up.
+    const httpIds = config.monitors.filter((m) => m.type === "http").map((m) => m.id).sort();
     const { results } = await env.DB.prepare("SELECT DISTINCT monitor FROM samples").all<{ monitor: string }>();
-    expect(results.map((r) => r.monitor).sort()).toEqual(["api", "checkout", "website"]);
-    expect(seen).toHaveLength(3);
+    expect(results.map((r) => r.monitor).sort()).toEqual(httpIds);
+    expect(seen).toHaveLength(httpIds.length);
   });
 
   afterEach(() => vi.unstubAllGlobals());

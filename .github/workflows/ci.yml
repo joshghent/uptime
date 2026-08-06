@@ -21,7 +21,6 @@ jobs:
       - run: pnpm lint:config
         env:
           NTFY_URL: https://ntfy.example/ci
-          NTFY_CRITICAL_URL: https://ntfy.example/ci
           HEARTBEAT_TOKEN: ci
       - run: pnpm test
 

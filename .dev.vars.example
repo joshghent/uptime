@@ -2,5 +2,4 @@
 # Copy to .dev.vars (gitignored) for `wrangler dev`; in production set the same
 # names with `npx wrangler secret put <NAME>`.
 NTFY_URL=https://ntfy.sh/your-topic
-NTFY_CRITICAL_URL=https://ntfy.sh/your-critical-topic
 HEARTBEAT_TOKEN=change-me
