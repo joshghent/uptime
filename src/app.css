@@ -1,0 +1,264 @@
+/* Status page styles. Semantic tokens only — see tokens.css. */
+
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  font-family: var(--tt-font-sans);
+}
+
+body {
+  background: var(--tt-color-canvas);
+  color: var(--tt-color-text-primary);
+  font-size: var(--tt-text-14);
+  line-height: var(--tt-leading-14);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+
+:focus-visible {
+  outline: 2px solid var(--tt-color-focus);
+  outline-offset: 2px;
+  border-radius: var(--tt-radius-sm);
+}
+:focus:not(:focus-visible) { outline: none; }
+
+a { color: var(--tt-color-accent); text-decoration: underline; text-underline-offset: 2px; }
+a:hover { color: var(--tt-color-accent-hover); }
+
+h1, h2, h3 { font-weight: var(--tt-weight-semibold); letter-spacing: var(--tt-tracking-snug); }
+
+.tt-container { max-width: var(--tt-layout-content-max); margin-inline: auto; padding-inline: var(--tt-space-6); }
+.tt-muted { color: var(--tt-color-text-muted); }
+.tt-numeric { font-variant-numeric: tabular-nums; }
+.tt-label {
+  font-size: var(--tt-text-12);
+  font-weight: var(--tt-weight-medium);
+  letter-spacing: var(--tt-tracking-wide);
+  text-transform: uppercase;
+  color: var(--tt-color-text-muted);
+}
+
+/* ------------------------------------------------------------------ mark */
+
+.tt-mark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5em;
+  font-size: var(--tt-text-18);
+  font-weight: var(--tt-weight-semibold);
+  letter-spacing: var(--tt-tracking-snug);
+  color: var(--tt-color-text-primary);
+  text-decoration: none;
+}
+.tt-mark:hover { color: var(--tt-color-text-primary); }
+.tt-mark__glyph {
+  font-family: "Public Sans", "Segoe UI Symbol", "Noto Sans Symbols 2", sans-serif;
+  font-size: var(--tt-text-21);
+  color: var(--tt-color-mark);
+}
+
+/* ---------------------------------------------------------------- layout */
+
+.site {
+  border-block-end: 1px solid var(--tt-color-canvas-border);
+  background: var(--tt-color-canvas-subtle);
+}
+.site__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tt-space-4);
+  min-height: 56px;
+  padding-block: var(--tt-space-3);
+  flex-wrap: wrap;
+}
+
+main { padding-block: var(--tt-space-8) var(--tt-space-12); }
+.lede { font-size: var(--tt-text-16); margin-block-end: var(--tt-space-5); }
+
+.foot {
+  border-block-start: 1px solid var(--tt-color-canvas-border);
+  padding-block: var(--tt-space-6);
+  margin-block-start: var(--tt-space-10);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tt-space-4);
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--tt-text-13);
+  color: var(--tt-color-text-muted);
+}
+
+/* ---------------------------------------------------------------- banner */
+
+/* The overall verdict, stated in words before any colour is read. */
+.banner {
+  display: flex;
+  gap: var(--tt-space-4);
+  align-items: flex-start;
+  padding: var(--tt-space-5) var(--tt-space-6);
+  border: 1px solid var(--tt-color-border);
+  border-inline-start: 3px solid var(--tt-color-text-muted);
+  border-radius: var(--tt-radius-lg);
+  background: var(--tt-color-bg-subtle);
+  margin-block-end: var(--tt-space-8);
+}
+.banner__icon { flex: none; margin-block-start: 2px; }
+.banner__title { font-size: var(--tt-text-18); font-weight: var(--tt-weight-semibold); }
+.banner__detail { color: var(--tt-color-text-secondary); margin-block-start: var(--tt-space-1); }
+
+.banner--up { border-color: var(--tt-color-success-border); border-inline-start-color: var(--tt-color-success); background: var(--tt-color-success-bg); }
+.banner--up .banner__icon, .banner--up .banner__title { color: var(--tt-color-success-text); }
+.banner--degraded { border-color: var(--tt-color-warning-border); border-inline-start-color: var(--tt-color-warning); background: var(--tt-color-warning-bg); }
+.banner--degraded .banner__icon, .banner--degraded .banner__title { color: var(--tt-color-warning-text); }
+.banner--down { border-color: var(--tt-color-danger-border); border-inline-start-color: var(--tt-color-danger); background: var(--tt-color-danger-bg); }
+.banner--down .banner__icon, .banner--down .banner__title { color: var(--tt-color-danger-text); }
+
+/* ----------------------------------------------------------------- cards */
+
+/* 90 bars need room. Below ~420px of card width they stop being readable, so
+   the tiles go two-up rather than three-up on a normal laptop. */
+.monitors {
+  display: grid;
+  gap: var(--tt-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+}
+
+.card {
+  background: var(--tt-color-surface);
+  border: 1px solid var(--tt-color-border);
+  border-radius: var(--tt-radius-lg);
+  padding: var(--tt-space-5) var(--tt-space-6) var(--tt-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--tt-space-4);
+}
+.card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--tt-space-4); }
+.card__name { font-size: var(--tt-text-16); line-height: var(--tt-leading-16); }
+.card__desc { font-size: var(--tt-text-13); color: var(--tt-color-text-muted); margin-block-start: 2px; }
+.card__foot {
+  display: flex;
+  /* Pins the meta row to the bottom so tiles of different heights still line
+     their footers up. */
+  margin-block-start: auto;
+  justify-content: space-between;
+  gap: var(--tt-space-3);
+  font-size: var(--tt-text-12);
+  color: var(--tt-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.card__error {
+  font-family: var(--tt-font-mono);
+  font-size: var(--tt-text-12);
+  color: var(--tt-color-danger-text);
+  background: var(--tt-color-danger-bg);
+  border: 1px solid var(--tt-color-danger-border);
+  border-radius: var(--tt-radius-sm);
+  padding: var(--tt-space-2) var(--tt-space-3);
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- status */
+
+.status { display: inline-flex; align-items: center; gap: var(--tt-space-1); font-size: var(--tt-text-13); white-space: nowrap; }
+.status::before { content: ""; width: 6px; height: 6px; border-radius: var(--tt-radius-full); background: currentColor; flex: none; }
+.status--up { color: var(--tt-color-success-text); }
+.status--degraded { color: var(--tt-color-warning-text); }
+.status--down { color: var(--tt-color-danger-text); }
+.status--unknown { color: var(--tt-color-text-muted); }
+
+.badge {
+  display: inline-block;
+  padding: 2px var(--tt-space-2);
+  border: 1px solid var(--tt-color-border);
+  border-radius: var(--tt-radius-sm);
+  background: var(--tt-color-bg-muted);
+  font-size: var(--tt-text-12);
+  font-weight: var(--tt-weight-medium);
+  color: var(--tt-color-text-secondary);
+}
+
+/* ------------------------------------------------------------------ bars */
+
+/* 90 days, oldest to newest. Each bar carries a title with the date and the
+   counts, so the colour is never the only way to read a day.
+   Grid rather than flex: `minmax(0, 1fr)` cannot overflow its container, and
+   auto-flow means the bars hidden at small widths give their space back
+   instead of leaving 60 empty columns. */
+.bars {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 2px;
+  height: 38px;
+}
+.bars > * {
+  border-radius: 2px;
+  background: var(--tt-color-bg-emphasis);
+}
+.bar--up { background: var(--tt-color-success); }
+.bar--degraded { background: var(--tt-color-warning); }
+.bar--down { background: var(--tt-color-danger); }
+.bar--none { background: var(--tt-color-bg-emphasis); }
+
+/* On a phone, 90 bars are sub-pixel. Drop the oldest 60 rather than render
+   mush — `display: none` also removes their grid tracks, so the remaining 30
+   expand to fill the row. */
+.narrow { display: none; }
+@media (max-width: 640px) {
+  .bars > *:nth-child(-n + 60) { display: none; }
+  .wide { display: none; }
+  .narrow { display: inline; }
+}
+
+.bars__scale {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tt-space-2);
+  font-size: var(--tt-text-12);
+  color: var(--tt-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------------------------------------------------- incidents */
+
+.section { margin-block-start: var(--tt-space-12); }
+.section > h2 { font-size: var(--tt-text-21); margin-block-end: var(--tt-space-4); }
+
+.incidents { list-style: none; padding: 0; border-block-start: 1px solid var(--tt-color-border); }
+.incident {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--tt-space-2) var(--tt-space-4);
+  align-items: baseline;
+  padding-block: var(--tt-space-4);
+  border-block-end: 1px solid var(--tt-color-border);
+}
+.incident__name { font-weight: var(--tt-weight-medium); }
+.incident__reason { grid-column: 1 / -1; font-size: var(--tt-text-13); color: var(--tt-color-text-secondary); overflow-wrap: anywhere; }
+.incident__when { font-size: var(--tt-text-13); color: var(--tt-color-text-muted); font-variant-numeric: tabular-nums; text-align: right; }
+
+.key { display: flex; flex-wrap: wrap; gap: var(--tt-space-4); }
+.key span { display: inline-flex; align-items: center; gap: var(--tt-space-2); }
+.key i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
+
+.empty {
+  padding: var(--tt-space-10) var(--tt-space-6);
+  text-align: center;
+  border: 1px dashed var(--tt-color-border-strong);
+  border-radius: var(--tt-radius-md);
+  color: var(--tt-color-text-muted);
+}
+
+.skip { position: absolute; left: -9999px; }
+.skip:focus {
+  left: var(--tt-space-4);
+  top: var(--tt-space-4);
+  z-index: var(--tt-z-toast);
+  background: var(--tt-color-surface);
+  border: 1px solid var(--tt-color-border-strong);
+  border-radius: var(--tt-radius-md);
+  padding: var(--tt-space-2) var(--tt-space-3);
+}

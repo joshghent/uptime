@@ -1,0 +1,122 @@
+import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import worker from "../src/index.ts";
+
+const get = async (path: string, init?: RequestInit) => {
+  const ctx = createExecutionContext();
+  const res = await worker.fetch(new Request(`https://status.test${path}`, init), env, ctx);
+  await waitOnExecutionContext(ctx);
+  return res;
+};
+
+beforeEach(async () => {
+  await env.DB.exec("DELETE FROM samples");
+  await env.DB.exec("DELETE FROM daily");
+  await env.DB.exec("DELETE FROM incidents");
+  await env.DB.exec("DELETE FROM heartbeats");
+});
+
+describe("GET /", () => {
+  it("renders every monitor from status.yaml", async () => {
+    const res = await get("/");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toMatch(/text\/html/);
+
+    const html = await res.text();
+    expect(html).toContain("Turbo Technologies Status");
+    for (const name of ["Website", "API", "Checkout", "Nightly backup"]) expect(html).toContain(name);
+    // 90 day bars per monitor, all grey before any check has run.
+    expect(html.match(/class="bar--none"/g)).toHaveLength(4 * 90);
+    expect(html).toContain("Waiting for the first check");
+  });
+
+  it("shows an incident banner while a monitor is down", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    await env.DB.prepare("INSERT INTO incidents (monitor, started_at, reason) VALUES (?, ?, ?)")
+      .bind("api", now - 600, "unexpected status 503")
+      .run();
+
+    const html = await get("/").then((r) => r.text());
+    expect(html).toContain("Some systems are down");
+    expect(html).toContain("unexpected status 503");
+    expect(html).toContain('class="status status--down"');
+  });
+
+  it("escapes values that come from the config and the database", async () => {
+    await env.DB.prepare("INSERT INTO incidents (monitor, started_at, reason) VALUES (?, ?, ?)")
+      .bind("api", 1, "<script>alert(1)</script>")
+      .run();
+    const html = await get("/").then((r) => r.text());
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+});
+
+describe("GET /api/status", () => {
+  it("returns the same data as JSON", async () => {
+    const res = await get("/api/status");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+
+    const body = (await res.json()) as { monitors: unknown[]; overall: string; windowDays: number };
+    expect(body.windowDays).toBe(90);
+    expect(body.overall).toBe("unknown");
+    expect(body.monitors).toHaveLength(4);
+    expect(body.monitors[0]).toMatchObject({ id: "website", name: "Website", uptime: null });
+  });
+});
+
+describe("GET /ping/:id", () => {
+  it("records a ping when the token matches", async () => {
+    const res = await get("/ping/nightly-backup?token=test-token");
+    expect(res.status).toBe(200);
+    const row = await env.DB.prepare("SELECT last_ping FROM heartbeats WHERE monitor = 'nightly-backup'").first();
+    expect(row).not.toBeNull();
+  });
+
+  it("accepts the token as a bearer header", async () => {
+    const res = await get("/ping/nightly-backup", { headers: { authorization: "Bearer test-token" } });
+    expect(res.status).toBe(200);
+  });
+
+  it("rejects a missing or wrong token", async () => {
+    expect((await get("/ping/nightly-backup")).status).toBe(401);
+    expect((await get("/ping/nightly-backup?token=nope")).status).toBe(401);
+    const row = await env.DB.prepare("SELECT last_ping FROM heartbeats WHERE monitor = 'nightly-backup'").first();
+    expect(row).toBeNull();
+  });
+
+  it("404s for an unknown id and for an HTTP monitor", async () => {
+    expect((await get("/ping/nope")).status).toBe(404);
+    expect((await get("/ping/website")).status).toBe(404);
+  });
+});
+
+describe("scheduled", () => {
+  it("checks monitors and writes samples", async () => {
+    // Without this the checks reach the real network, which miniflare blocks
+    // with an opaque error rather than a useful failure.
+    const seen: string[] = [];
+    vi.stubGlobal("fetch", async (input: RequestInfo) => {
+      seen.push(String(input));
+      return new Response('{"status":"ok"}', { status: 200 });
+    });
+
+    const ctx = createExecutionContext();
+    await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.now() } as ScheduledController, env, ctx);
+    await waitOnExecutionContext(ctx);
+
+    // The heartbeat has never been pinged, so only the three HTTP monitors ran.
+    const { results } = await env.DB.prepare("SELECT DISTINCT monitor FROM samples").all<{ monitor: string }>();
+    expect(results.map((r) => r.monitor).sort()).toEqual(["api", "checkout", "website"]);
+    expect(seen).toHaveLength(3);
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+});
+
+describe("GET /health", () => {
+  it("answers without touching the database", async () => {
+    expect(await get("/health").then((r) => r.text())).toBe("ok\n");
+  });
+});

@@ -1,0 +1,4 @@
+# esbuild and workerd download platform binaries in a postinstall script.
+allowBuilds:
+  esbuild: true
+  workerd: true

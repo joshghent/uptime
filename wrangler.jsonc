@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "uptime",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // status.yaml is bundled into the Worker as a string at build time. The
+  // config lives in git, not in a database — editing it means a deploy, which
+  // is the whole point. The CSS is inlined into the page for the same reason:
+  // one request, no asset pipeline.
+  "rules": [{ "type": "Text", "globs": ["**/*.yaml", "**/*.css"], "fallthrough": true }],
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "uptime",
+      "database_id": "9e65ec91-1221-4208-a292-28d48027148d",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // The cron fires every minute; each monitor is skipped unless its own
+  // `interval` has elapsed. Lower the frequency here if you want fewer D1
+  // writes than your monitors' intervals imply.
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}

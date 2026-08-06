@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "lib": ["es2022"],
+    // Worker runtime types come from worker-configuration.d.ts (`pnpm
+    // cf-typegen`). Node's are for the linter script and the vitest config.
+    "types": ["@cloudflare/vitest-pool-workers/types", "node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src", "test", "scripts", "worker-configuration.d.ts", "vitest.config.ts"]
+}

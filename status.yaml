@@ -1,0 +1,67 @@
+# Your status page, in one file.
+#
+#   pnpm lint:config    check this file
+#   pnpm run deploy     publish the change
+#
+# Every `${VAR}` below is read from a Worker secret:
+#   npx wrangler secret put NTFY_URL
+
+title: Turbo Technologies Status
+description: Live availability for everything we run.
+link: https://turbotechnologies.co
+
+# Days of raw check results to keep. The 90-day bars come from daily rollups,
+# so this only bounds the recent-window alarm rules.
+retain_days: 7
+
+# Applied to every monitor unless the monitor overrides it.
+defaults:
+  interval: 5m
+  timeout: 10s
+  expect_status: 2xx
+  failures_before_alarm: 2
+
+# Where alerts go. Either key can be a bare URL or { url, headers }.
+notify:
+  ntfy: ${NTFY_URL}
+  # webhook:
+  #   url: ${WEBHOOK_URL}
+  #   headers:
+  #     x-signature: ${WEBHOOK_SECRET}
+
+monitors:
+  - name: Website
+    url: https://turbotechnologies.co
+    description: Marketing site and docs
+
+  - name: API
+    url: https://api.turbotechnologies.co/health
+    description: Public REST API
+    interval: 1m
+    expect_status: [200]
+    expect_body: '"status":"ok"'
+    degraded_ms: 800
+    # Two things can trip an alarm. With both set, whichever fires first wins.
+    failures_before_alarm: 2
+    failing_for: 5m
+
+  - name: Checkout
+    url: https://app.turbotechnologies.co/api/health
+    method: GET
+    headers:
+      user-agent: turbo-uptime
+    # Page this one somewhere louder than the rest.
+    notify:
+      ntfy: ${NTFY_CRITICAL_URL}
+
+  # A heartbeat monitor has no URL. The job calls
+  #   https://<your-worker>/ping/nightly-backup?token=...
+  # and goes into alarm when a ping does not arrive in time.
+  - name: Nightly backup
+    type: heartbeat
+    id: nightly-backup
+    description: Cron job on the database host
+    period: 24h
+    grace: 1h
+    interval: 5m
+    token: ${HEARTBEAT_TOKEN}

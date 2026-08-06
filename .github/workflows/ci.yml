@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      # status.yaml references secrets by name only; any value proves the shape.
+      - run: pnpm lint:config
+        env:
+          NTFY_URL: https://ntfy.example/ci
+          NTFY_CRITICAL_URL: https://ntfy.example/ci
+          HEARTBEAT_TOKEN: ci
+      - run: pnpm test
+
+  # Cloudflare Workers Builds deploys on push by default. If you'd rather deploy
+  # from Actions, set the repo variable DEPLOY_VIA_ACTIONS to "true" and add a
+  # CLOUDFLARE_API_TOKEN secret — and turn Workers Builds off so they don't race.
+  deploy:
+    needs: check
+    if: github.ref == 'refs/heads/main' && vars.DEPLOY_VIA_ACTIONS == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec wrangler d1 migrations apply uptime --remote
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - run: pnpm exec wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

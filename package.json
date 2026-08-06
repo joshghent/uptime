@@ -1,0 +1,32 @@
+{
+  "name": "uptime",
+  "version": "1.0.0",
+  "description": "Open source status page that runs on Cloudflare Workers + D1",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "lint": "npm run typecheck && npm run lint:config",
+    "lint:config": "node scripts/lint-config.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:create": "wrangler d1 create uptime",
+    "db:migrate": "wrangler d1 migrations apply uptime --remote",
+    "db:migrate:local": "wrangler d1 migrations apply uptime --local",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "hono": "^4.13.0",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.20.2",
+    "@types/node": "^26.1.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.119.0"
+  }
+}
