@@ -5,6 +5,11 @@
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
 
+  // Served from uptime.<subdomain>.workers.dev. To put it on your own domain,
+  // add a `routes` entry with `"custom_domain": true` — host it away from the
+  // apps it watches, or an outage takes the status page with it.
+  "workers_dev": true,
+
   // status.yaml is bundled into the Worker as a string at build time. The
   // config lives in git, not in a database — editing it means a deploy, which
   // is the whole point. The CSS is inlined into the page for the same reason:

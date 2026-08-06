@@ -121,7 +121,7 @@ For things that run on a schedule and have nothing to poll — cron jobs, backup
 queue workers. The job calls your status page when it finishes:
 
 ```sh
-curl -fsS "https://uptime.example.workers.dev/ping/nightly-backup?token=$HEARTBEAT_TOKEN"
+curl -fsS "https://uptime.example.workers.dev/ping/repowarden-daily-scan?token=$HEARTBEAT_TOKEN"
 ```
 
 The token can also go in an `Authorization: Bearer` header. If no ping arrives
