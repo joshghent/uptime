@@ -53,7 +53,7 @@ link: https://acme.com
 retain_days: 7          # raw check results kept; the 90-day bars use rollups
 
 defaults:               # inherited by every monitor
-  interval: 5m
+  interval: 1m
   timeout: 10s
   expect_status: 2xx
   failures_before_alarm: 2
@@ -217,12 +217,27 @@ To deploy from GitHub Actions instead, set the repo variable
 `DEPLOY_VIA_ACTIONS` to `true`, add a `CLOUDFLARE_API_TOKEN` secret, and turn
 Workers Builds off so the two don't race.
 
+## How fast you hear about it
+
+Detection time is `interval x failures_before_alarm`. The shipped config runs
+every monitor at `1m` with two consecutive failures, so an outage alerts about
+two minutes in. One minute is Cloudflare's cron floor, so that is the fastest
+this design goes. Alarming on a single failure halves it and pages you for
+every transient blip; that trade is yours to make.
+
+The notification itself is sent inside the same cron invocation that opens the
+incident, so there is no further delay once the threshold trips.
+
 ## Cost
 
-Every check is two D1 writes. Ten monitors at a five-minute interval is about
-5,800 writes a day, against a free-tier allowance of 100,000. A one-minute
-interval on the same ten monitors is about 29,000. Raise `interval` before you
-raise your bill.
+Every check is two D1 writes. Seven monitors at a one-minute interval is about
+20,000 writes a day against a free-tier allowance of 100,000, and roughly
+65,000 rows read against an allowance of 5,000,000.
+
+Keep it that way by never putting an unindexed query in the cron path. Two
+queries there run 1,440 times a day against a table that grows all day, so a
+sequential scan is the one mistake that turns a free status page into a bill.
+`test/query-plan.test.ts` asserts the plans and fails if an index is lost.
 
 ## Branding
 

@@ -142,13 +142,29 @@ describe("runChecks", () => {
     expect(rows[0]).toMatchObject({ monitor: "site", ok: 1, fail: 1, degraded: 0 });
   });
 
-  it("prunes samples past the retention window", async () => {
+  // NOW is deliberately on an hour boundary — retention only runs on the tick
+  // where `Math.floor(now / 60) % 60 === 0`.
+  it("is anchored on an hour boundary", () => {
+    expect(NOW % 3600).toBe(0);
+  });
+
+  it("prunes samples past the retention window on the hourly tick", async () => {
     const c = site();
     await runChecks(env.DB, c, NOW, fakeFetch([]).impl);
     await runChecks(env.DB, c, NOW + 8 * 86400, fakeFetch([]).impl);
 
     const { results } = await env.DB.prepare("SELECT ts FROM samples").all<{ ts: number }>();
     expect(results.map((r) => r.ts)).toEqual([NOW + 8 * 86400]);
+  });
+
+  it("does not prune on the other 59 ticks of the hour", async () => {
+    const c = site();
+    await runChecks(env.DB, c, NOW, fakeFetch([]).impl);
+    // 8 days later but one minute past the hour, so the old sample survives.
+    await runChecks(env.DB, c, NOW + 8 * 86400 + 60, fakeFetch([]).impl);
+
+    const { results } = await env.DB.prepare("SELECT ts FROM samples ORDER BY ts").all<{ ts: number }>();
+    expect(results).toHaveLength(2);
   });
 
   it("carries on when one monitor throws and still checks the others", async () => {

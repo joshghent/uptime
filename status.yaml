@@ -15,8 +15,12 @@ link: https://turbotechnologies.co.uk
 retain_days: 7
 
 # Applied to every monitor unless the monitor overrides it.
+#
+# 1m + 2 consecutive failures means an outage alerts within ~2 minutes, which
+# is as fast as this can go — Cloudflare's cron floor is one minute. Alarming
+# on a single failure would page you for every transient blip.
 defaults:
-  interval: 5m
+  interval: 1m
   timeout: 10s
   expect_status: 2xx
   failures_before_alarm: 2
@@ -41,7 +45,6 @@ monitors:
     # too rather than just that the Worker is up.
     expect_body: '"database":"connected"'
     degraded_ms: 1500
-    failing_for: 5m
 
   - name: RepoWarden
     url: https://repowarden.dev
@@ -52,7 +55,6 @@ monitors:
     description: API workers
     expect_body: '"status":"ok"'
     degraded_ms: 1500
-    failing_for: 5m
 
   - name: LoginLlama
     url: https://loginllama.app
@@ -63,7 +65,6 @@ monitors:
     description: Login-check API
     expect_body: '"status":"ok"'
     degraded_ms: 1500
-    failing_for: 5m
 
   # A heartbeat monitor has no URL. The job calls
   #   https://uptime.<subdomain>.workers.dev/ping/repowarden-daily-scan?token=...

@@ -43,24 +43,24 @@ export async function recentSamples(db: D1Database, monitor: string, limit: numb
   return results;
 }
 
-/** Most recent sample per monitor, for "last checked" and the due-check gate. */
-export async function lastSampleAt(db: D1Database): Promise<Map<string, number>> {
-  const { results } = await db
-    .prepare(`SELECT monitor, MAX(ts) AS ts FROM samples GROUP BY monitor`)
-    .all<{ monitor: string; ts: number }>();
-  return new Map(results.map((r) => [r.monitor, r.ts]));
-}
+export type LastSample = RecentSample & { monitor: string; error: string | null };
 
-export async function lastSamples(db: D1Database): Promise<Map<string, RecentSample & { error: string | null }>> {
-  const { results } = await db
-    .prepare(
-      `SELECT s.monitor, s.ts, s.ok, s.degraded, s.error FROM samples s
-       JOIN (SELECT monitor, MAX(ts) AS ts FROM samples GROUP BY monitor) m
-         ON m.monitor = s.monitor AND m.ts = s.ts
-       GROUP BY s.monitor`,
-    )
-    .all<RecentSample & { monitor: string; error: string | null }>();
-  return new Map(results.map((r) => [r.monitor, r]));
+/**
+ * Most recent sample per monitor, for "last checked", the card's error line and
+ * the due-check gate.
+ *
+ * One `LIMIT 1` per monitor rather than `MAX(ts) ... GROUP BY monitor`. The
+ * grouped form reads every row in the table — at a one-minute interval that is
+ * ~10k rows per monitor per day, on a query that runs every single cron tick.
+ * Each of these is an index seek that touches one row.
+ */
+export async function lastSamples(db: D1Database, monitors: string[]): Promise<Map<string, LastSample>> {
+  if (monitors.length === 0) return new Map();
+  const stmt = db.prepare(
+    `SELECT monitor, ts, ok, degraded, error FROM samples WHERE monitor = ? ORDER BY ts DESC LIMIT 1`,
+  );
+  const rows = await db.batch<LastSample>(monitors.map((m) => stmt.bind(m)));
+  return new Map(rows.flatMap((r) => r.results).map((r) => [r.monitor, r]));
 }
 
 export async function dailySince(db: D1Database, sinceDay: string): Promise<DailyRow[]> {

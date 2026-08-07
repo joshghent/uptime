@@ -29,8 +29,9 @@ export async function runChecks(
   now: number,
   fetchImpl: typeof fetch = fetch,
 ): Promise<RunResult[]> {
-  const [lastAt, open, heartbeats] = await Promise.all([
-    db.lastSampleAt(d1),
+  const ids = config.monitors.map((m) => m.id);
+  const [last, open, heartbeats] = await Promise.all([
+    db.lastSamples(d1, ids),
     db.openIncidents(d1),
     db.getHeartbeats(d1),
   ]);
@@ -40,8 +41,8 @@ export async function runChecks(
   // minute. The slack makes "due" mean "due within this tick".
   const slack = 5;
   const due = config.monitors.filter((m) => {
-    const last = lastAt.get(m.id);
-    return last === undefined || now - last >= m.interval - slack;
+    const at = last.get(m.id)?.ts;
+    return at === undefined || now - at >= m.interval - slack;
   });
 
   const settled = await Promise.allSettled(
@@ -54,8 +55,12 @@ export async function runChecks(
     else if (r.value) results.push(r.value);
   });
 
-  await db.pruneSamples(d1, now - config.retainDays * 86400);
-  await db.pruneDaily(d1, dayKey(now - 365 * 86400));
+  // Hourly, not every tick. Retention is a housekeeping job; running it 1,440
+  // times a day to delete the same nothing is pure cost.
+  if (Math.floor(now / 60) % 60 === 0) {
+    await db.pruneSamples(d1, now - config.retainDays * 86400);
+    await db.pruneDaily(d1, dayKey(now - 365 * 86400));
+  }
   return results;
 }
 
