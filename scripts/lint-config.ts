@@ -16,8 +16,28 @@ function read(): string {
   }
 }
 
+/**
+ * The same `.dev.vars` wrangler reads, so `${VAR}` resolves locally without
+ * exporting anything. A real environment variable still wins, which is what
+ * CI relies on.
+ */
+function devVars(): Record<string, string> {
+  let text: string;
+  try {
+    text = readFileSync(".dev.vars", "utf8");
+  } catch {
+    return {};
+  }
+  const out: Record<string, string> = {};
+  for (const line of text.split("\n")) {
+    const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
+    if (m) out[m[1]!] = m[2]!.trim().replace(/^["']|["']$/g, "");
+  }
+  return out;
+}
+
 try {
-  const config = loadConfig(read(), process.env);
+  const config = loadConfig(read(), { ...devVars(), ...process.env });
   console.log(`${path} is valid — ${config.monitors.length} monitors, "${config.title}"`);
   for (const m of config.monitors) {
     const how =
