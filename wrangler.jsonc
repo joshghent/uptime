@@ -5,9 +5,13 @@
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
 
-  // Served from uptime.<subdomain>.workers.dev. To put it on your own domain,
-  // add a `routes` entry with `"custom_domain": true` — host it away from the
-  // apps it watches, or an outage takes the status page with it.
+  // A status page belongs on a domain the apps it watches don't serve, so an
+  // outage there cannot take the page with it. `custom_domain` makes wrangler
+  // create the DNS record on deploy; the zone has to already be in the account.
+  "routes": [{ "pattern": "status.turbotechnologies.co.uk", "custom_domain": true }],
+
+  // Kept on so the workers.dev URL stays a working fallback if DNS or the
+  // certificate ever has a bad day.
   "workers_dev": true,
 
   // status.yaml is bundled into the Worker as a string at build time. The

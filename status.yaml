@@ -8,7 +8,7 @@
 
 title: Turbo Technologies Status
 description: Live availability for Plan Pacer, RepoWarden and LoginLlama.
-link: https://turbotechnologies.co
+link: https://turbotechnologies.co.uk
 
 # Days of raw check results to keep. The 90-day bars come from daily rollups,
 # so this only bounds the recent-window alarm rules.

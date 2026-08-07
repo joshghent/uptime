@@ -28,6 +28,17 @@ pnpm run deploy
 
 Your page is live at `https://uptime.<your-subdomain>.workers.dev`.
 
+To put it on your own domain, add a route to `wrangler.jsonc` and deploy again —
+wrangler creates the DNS record for you, as long as the zone is already in the
+same Cloudflare account:
+
+```jsonc
+"routes": [{ "pattern": "status.example.com", "custom_domain": true }]
+```
+
+Pick a domain none of the monitored apps serve. A status page that shares
+infrastructure with the thing it watches goes down at exactly the wrong moment.
+
 > `pnpm deploy` is a built-in pnpm command. Use `pnpm run deploy`.
 
 ## Configuration
