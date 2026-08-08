@@ -240,6 +240,9 @@ main { padding-block: var(--tt-space-8) var(--tt-space-12); }
 .incident__reason { grid-column: 1 / -1; font-size: var(--tt-text-13); color: var(--tt-color-text-secondary); overflow-wrap: anywhere; }
 .incident__when { font-size: var(--tt-text-13); color: var(--tt-color-text-muted); font-variant-numeric: tabular-nums; text-align: right; }
 
+.cta { gap: var(--tt-space-3); max-width: 60ch; }
+.cta p { color: var(--tt-color-text-secondary); }
+
 .key { display: flex; flex-wrap: wrap; gap: var(--tt-space-4); }
 .key span { display: inline-flex; align-items: center; gap: var(--tt-space-2); }
 .key i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }

@@ -5,6 +5,7 @@ import { esc, renderPage } from "./page.ts";
 import { runChecks } from "./run.ts";
 import { buildStatus } from "./status.ts";
 import source from "../status.yaml";
+import llms from "../llms.txt";
 
 export type Env = Cloudflare.Env;
 
@@ -48,6 +49,14 @@ app.on(["GET", "POST"], "/ping/:id", async (c) => {
   await db.recordPing(c.env.DB, id, now());
   return c.text("ok\n");
 });
+
+/**
+ * The whole reference — endpoints, JSON shape, every config key — as one plain
+ * text file an agent can fetch instead of scraping the page or the repo.
+ */
+app.get("/llms.txt", (c) =>
+  c.text(llms, 200, { "cache-control": "public, max-age=3600", "access-control-allow-origin": "*" }),
+);
 
 app.get("/health", (c) => c.text("ok\n"));
 

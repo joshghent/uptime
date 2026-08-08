@@ -7,6 +7,9 @@ import appCss from "./app.css";
 const ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 export const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ESCAPES[c]!);
 
+/** Where "run your own" points. One place, so a fork edits one line. */
+const REPO = "https://github.com/joshghent/uptime";
+
 const LABEL: Record<State, string> = {
   up: "Operational",
   degraded: "Degraded",
@@ -158,6 +161,17 @@ ${s.description ? `<meta name="description" content="${esc(s.description)}">` : 
     }
   </section>
 
+  <section class="section">
+    <h2>Run your own</h2>
+    <div class="card cta">
+      <p>This page is <a href="${REPO}">joshghent/uptime</a>, an open-source status
+      page that runs on Cloudflare Workers and D1. Monitors live in one YAML file,
+      checked by a cron, rendered server-side. Free on Cloudflare's free tier for a
+      handful of monitors.</p>
+      <p class="tt-muted"><a href="${REPO}#quick-start">Set one up</a> · <a href="${REPO}">Source on GitHub</a> · <a href="/llms.txt">llms.txt</a> for agents</p>
+    </div>
+  </section>
+
   <footer class="foot">
     <div class="key">
       <span><i style="background:var(--tt-color-success)"></i> Operational</span>
@@ -165,7 +179,7 @@ ${s.description ? `<meta name="description" content="${esc(s.description)}">` : 
       <span><i style="background:var(--tt-color-danger)"></i> Down</span>
       <span><i style="background:var(--tt-color-bg-emphasis)"></i> No data</span>
     </div>
-    <span>Last ${s.windowDays} days · <a href="/api/status">JSON</a> · <a href="https://github.com/joshghent/uptime">Source</a></span>
+    <span>Last ${s.windowDays} days · <a href="/api/status">JSON</a> · <a href="/llms.txt">llms.txt</a> · <a href="${REPO}">Source</a></span>
   </footer>
 </main>
 </body>
