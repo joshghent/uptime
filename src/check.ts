@@ -87,7 +87,9 @@ export function checkHeartbeat(
     degraded: false,
     status: null,
     latencyMs: null,
-    error: `no ping for ${formatDuration(age)} (expected every ${formatDuration(m.period)})`,
+    // The deadline, not the period — the deadline is what tripped, and naming
+    // the period makes the page look like it wants more frequent pings.
+    error: `no ping for ${formatDuration(age)}, expected within ${formatDuration(deadline)}`,
   };
 }
 
@@ -117,7 +119,11 @@ export function formatDuration(seconds: number): string {
   if (s < 60) return `${s}s`;
   if (s < 3600) return `${Math.round(s / 60)}m`;
   if (s < 86400) return `${Math.round(s / 3600)}h`;
-  return `${Math.round(s / 86400)}d`;
+  // Days carry their hours. Whole days alone put a 24h period and its 26h
+  // deadline on the same string, which reads as a contradiction.
+  const days = Math.floor(s / 86400);
+  const hours = Math.floor((s % 86400) / 3600);
+  return hours === 0 ? `${days}d` : `${days}d ${hours}h`;
 }
 
 /** UTC date key, `YYYY-MM-DD`. */
