@@ -39,6 +39,12 @@ describe("GET /", () => {
     expect(html).toContain("Waiting for the first check");
   });
 
+  it("points at the source repo so a visitor can run their own", async () => {
+    const html = await get("/").then((r) => r.text());
+    expect(html).toContain("Run your own");
+    expect(html).toContain("https://github.com/joshghent/uptime");
+  });
+
   it("shows an incident banner while a monitor is down", async () => {
     const now = Math.floor(Date.now() / 1000);
     await env.DB.prepare("INSERT INTO incidents (monitor, started_at, reason) VALUES (?, ?, ?)")
@@ -58,6 +64,26 @@ describe("GET /", () => {
     const html = await get("/").then((r) => r.text());
     expect(html).not.toContain("<script>alert(1)</script>");
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+});
+
+describe("GET /llms.txt", () => {
+  it("serves the reference as plain text, CORS-open", async () => {
+    const res = await get("/llms.txt");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toMatch(/text\/plain/);
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+
+    const text = await res.text();
+    // The reference is only useful to an agent if it covers both halves: how to
+    // read a running page, and how to configure one.
+    expect(text).toContain("/api/status");
+    expect(text).toContain("expect_body");
+    expect(text).toContain("period");
+  });
+
+  it("is linked from the page, so an agent can find it without guessing", async () => {
+    expect(await get("/").then((r) => r.text())).toContain('href="/llms.txt"');
   });
 });
 

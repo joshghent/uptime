@@ -18,7 +18,7 @@
   // config lives in git, not in a database — editing it means a deploy, which
   // is the whole point. The CSS is inlined into the page for the same reason:
   // one request, no asset pipeline.
-  "rules": [{ "type": "Text", "globs": ["**/*.yaml", "**/*.css"], "fallthrough": true }],
+  "rules": [{ "type": "Text", "globs": ["**/*.yaml", "**/*.css", "**/*.txt"], "fallthrough": true }],
 
   "d1_databases": [
     {

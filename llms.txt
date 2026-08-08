@@ -1,0 +1,263 @@
+# uptime
+
+> An open-source status page that runs on Cloudflare Workers and D1. Monitors
+> are declared in one YAML file, checked by a cron, rendered server-side.
+> Source: https://github.com/joshghent/uptime (MIT)
+
+This file is served by every deployment at `/llms.txt`. It is the whole
+reference: endpoints, JSON shape, and every configuration key.
+
+## Endpoints
+
+GET  /            The status page, HTML. Cached 30s.
+GET  /api/status  The same data as JSON. Cached 30s. `access-control-allow-origin: *`.
+GET  /ping/:id    Heartbeat receiver. POST works too. Returns 200 `ok`, 401 on a
+                  bad token, 404 on an unknown or non-heartbeat id.
+GET  /health      Liveness for the status page itself. Returns 200 `ok`.
+GET  /llms.txt    This file.
+
+Read `/api/status` rather than scraping the HTML. It is the same data the page
+renders, from the same query.
+
+## /api/status
+
+```json
+{
+  "title": "Acme Status",
+  "description": "Live availability for everything we run.",
+  "link": "https://acme.com",
+  "generatedAt": 1786172940,
+  "windowDays": 90,
+  "overall": "up",
+  "monitors": [
+    {
+      "id": "api",
+      "name": "API",
+      "description": "API and database",
+      "type": "http",
+      "state": "up",
+      "uptime": 0.9998,
+      "days": [{ "day": "2026-05-11", "state": "up", "ok": 1440, "fail": 0, "degraded": 0 }],
+      "lastCheck": 1786172933,
+      "lastError": null,
+      "incident": null
+    }
+  ],
+  "incidents": [
+    {
+      "id": 1,
+      "monitor": "api",
+      "started_at": 1786153013,
+      "resolved_at": null,
+      "reason": "unexpected status 503"
+    }
+  ]
+}
+```
+
+Field notes:
+
+- All timestamps are Unix seconds, UTC.
+- `overall` is the worst monitor state.
+- `state` is one of `up`, `degraded`, `down`, `unknown`. `degraded` means either
+  the last check was slower than `degraded_ms`, or the monitor is failing but
+  has not yet met its alarm rule.
+- `uptime` is a fraction 0-1 over `windowDays`, computed as
+  `passed / (passed + failed)`. It is `null` when nothing has been recorded.
+- `days` always has `windowDays` entries, oldest first, one per UTC day. A day's
+  `state` is `none` when no check ran, `down` if any check failed, `degraded` if
+  any was slow, otherwise `up`.
+- `incident` is the monitor's currently open incident, or `null`.
+- `incidents` covers the whole window, newest first, open and resolved.
+  `resolved_at` is `null` while an incident is open.
+
+## Heartbeats
+
+For jobs with nothing to poll — crons, backups, queue workers. The job calls the
+status page when it finishes:
+
+```sh
+curl -fsS "https://status.example.com/ping/nightly-backup?token=$HEARTBEAT_TOKEN"
+```
+
+The token may instead go in an `Authorization: Bearer <token>` header. If no
+ping arrives within `period + grace`, an incident opens like any other failure.
+
+A heartbeat that has never been pinged records nothing and never alerts, so it
+is safe to add one before the job is wired up. The first ping is what starts the
+clock: after that, silence is a failure.
+
+## Configuration
+
+One file, `status.yaml`, bundled into the Worker at build time. Editing it means
+a deploy. `pnpm lint:config` validates it and names every problem.
+
+Any `${VAR}` in any string is replaced from the Worker's environment before
+validation, so secrets stay out of git. A referenced variable that is not set
+fails the lint and the deploy, naming the variable. Set them with
+`npx wrangler secret put NAME`, or in `.dev.vars` for local runs.
+
+### Top level
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `title` | string | `Status` | Page title and header |
+| `description` | string | — | Sub-line under the header and the meta description |
+| `link` | URL | — | Where the header logo links; usually your product |
+| `retain_days` | int > 0 | `7` | Days of raw check results kept. The 90-day bars read daily rollups, so this only bounds the recent-window alarm rules |
+| `defaults` | map | `{}` | Inherited by every monitor; see below |
+| `notify` | map | — | Where alerts go; see below |
+| `monitors` | list | — | At least one required |
+
+Unknown keys are rejected rather than ignored, at every level.
+
+### defaults
+
+Applied to every monitor that does not set the key itself. Every key is
+optional: `interval`, `timeout`, `expect_status`, `failures_before_alarm`,
+`failing_for`, `degraded_ms`. They mean exactly what they mean on a monitor.
+
+`expect_status` in `defaults` only reaches HTTP monitors.
+
+### notify
+
+Valid at the top level and on any monitor. A monitor's `notify` replaces the
+global one per target, so a monitor can override `ntfy` and still inherit
+`webhook`.
+
+| Key | Type | Meaning |
+|---|---|---|
+| `ntfy` | URL or `{ url, headers }` | An [ntfy](https://ntfy.sh) topic URL |
+| `webhook` | URL or `{ url, headers }` | Any endpoint that accepts a JSON POST |
+
+Both fire when an incident opens and again when it resolves. The webhook body:
+
+```json
+{
+  "monitor": "api",
+  "name": "API",
+  "event": "down",
+  "reason": "unexpected status 503",
+  "at": "2026-08-07T12:34:56.000Z"
+}
+```
+
+`event` is `down` or `up`. A notification that fails is logged and never blocks
+a check from being recorded.
+
+### monitors
+
+Every monitor is `type: http` (the default) or `type: heartbeat`.
+
+Shared by both types:
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `name` | string | — | Required. Shown on the card |
+| `id` | `[a-z0-9-]+` | slug of `name` | Stable key used in the database, the JSON and `/ping/:id`. Must be unique. Change it and the monitor's history starts over |
+| `description` | string | — | Sub-line on the card |
+| `type` | `http` \| `heartbeat` | `http` | |
+| `interval` | duration | `60s` | How often to check. For a heartbeat this is how often its freshness is re-evaluated, not how often you must ping — that is `period` |
+| `timeout` | duration | `10s` | Request timeout. HTTP only in effect |
+| `failures_before_alarm` | int > 0 | `2` | Consecutive failures that open an incident |
+| `failing_for` | duration | — | Failure streak duration that opens an incident |
+| `degraded_ms` | int > 0 | — | Slower than this and a passing check counts as degraded, not down. HTTP only in effect |
+| `notify` | map | inherits global | See above |
+
+HTTP monitors only:
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `url` | URL | — | Required |
+| `method` | string | `GET` | Any HTTP method; upper-cased for you |
+| `headers` | map of string | — | Request headers |
+| `body` | string | — | Request body |
+| `expect_status` | int, list of int, or `Nxx` | `2xx` | `200`, `[200, 204]`, or a class like `2xx`. Anything else fails the check |
+| `expect_body` | string | — | Substring the response body must contain. Only set this when you need it: it forces the body to be read, which counts toward latency |
+
+Redirects are followed. Latency is measured after the body is read.
+
+Heartbeat monitors only:
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `period` | duration | — | Required. How often the job is expected to ping |
+| `grace` | duration | `0` | Extra slack on top of `period` before a missing ping counts as a failure |
+| `token` | string | — | When set, the ping must present it as `?token=` or `Authorization: Bearer`. Use `${VAR}` |
+
+### Durations
+
+`500ms`, `30s`, `5m`, `24h`, `2d`, or a bare number meaning seconds. Anything
+else is a lint error.
+
+### Alarm rules
+
+`failures_before_alarm` and `failing_for` answer different questions: how many
+in a row, and for how long. Set one, or set both and the first to trip wins.
+Setting only `failing_for` removes the count default, so a duration rule is not
+pre-empted by two quick failures.
+
+Between the first failure and the alarm a monitor shows as `degraded` rather
+than `up`, so a wobble is visible before it becomes an incident.
+
+Detection time is `interval x failures_before_alarm`. One minute is Cloudflare's
+cron floor, so a 1m interval with 2 failures — about two minutes — is as fast as
+this design goes.
+
+### Example
+
+```yaml
+title: Acme Status
+description: Live availability for everything we run.
+link: https://acme.com
+
+retain_days: 7
+
+defaults:
+  interval: 1m
+  timeout: 10s
+  expect_status: 2xx
+  failures_before_alarm: 2
+
+notify:
+  ntfy: ${NTFY_URL}
+  webhook:
+    url: ${WEBHOOK_URL}
+    headers:
+      x-signature: ${WEBHOOK_SECRET}
+
+monitors:
+  - name: Website
+    url: https://acme.com
+
+  - name: API
+    url: https://api.acme.com/health
+    description: API and database
+    expect_status: [200]
+    expect_body: '"status":"ok"'
+    degraded_ms: 800
+    failing_for: 5m
+
+  - name: Nightly backup
+    type: heartbeat
+    id: nightly-backup
+    period: 24h
+    grace: 1h
+    token: ${HEARTBEAT_TOKEN}
+```
+
+## Running your own
+
+```sh
+git clone https://github.com/joshghent/uptime && cd uptime
+pnpm install
+npx wrangler d1 create uptime      # copy database_id into wrangler.jsonc
+pnpm run db:migrate
+# edit status.yaml
+pnpm lint:config
+pnpm run deploy
+```
+
+Cloudflare's free tier covers a handful of monitors. Full setup, custom domains,
+cost notes and development instructions are in the README:
+https://github.com/joshghent/uptime#readme

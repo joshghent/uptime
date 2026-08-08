@@ -10,6 +10,7 @@ through, no per-monitor pricing, no vendor holding your incident history.
 - Heartbeat monitors: your cron pings *us*, and a missed ping is an incident
 - Alerts to [ntfy](https://ntfy.sh) and any webhook, globally or per monitor
 - 90 days of uptime bars, incident history, and a JSON API
+- `/llms.txt` and a CORS-open JSON API, so an agent reads it in one fetch
 - One config file, linted before you deploy
 
 ## Quick start
@@ -78,31 +79,53 @@ monitors:
     grace: 1h
 ```
 
+### Top-level keys
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `title` | string | `Status` | Page title and header |
+| `description` | string | — | Sub-line under the header, and the meta description |
+| `link` | URL | — | Where the header logo links; usually your product |
+| `retain_days` | int > 0 | `7` | Days of raw check results kept. The 90-day bars read daily rollups, so this only bounds the recent-window alarm rules |
+| `defaults` | map | `{}` | Inherited by every monitor |
+| `notify` | map | — | Where alerts go |
+| `monitors` | list | — | At least one required |
+
+Unknown keys are rejected rather than ignored, at every level — a typo is a
+lint failure, not a setting that silently does nothing.
+
+`defaults` takes `interval`, `timeout`, `expect_status`,
+`failures_before_alarm`, `failing_for` and `degraded_ms`. Each means what it
+means on a monitor, and a monitor that sets the key wins. `expect_status` only
+reaches HTTP monitors.
+
 ### Monitor options
 
 | Key | Applies to | Default | Meaning |
 |---|---|---|---|
-| `name` | both | — | Shown on the card |
-| `id` | both | slug of `name` | Stable key used in the database and in `/ping/:id` |
+| `name` | both | — | Required. Shown on the card |
+| `id` | both | slug of `name` | Stable key used in the database, the JSON and `/ping/:id`. Lowercase `a-z`, `0-9` and `-`, unique. Change it and the monitor's history starts over |
 | `description` | both | — | Sub-line on the card |
 | `type` | both | `http` | `http` or `heartbeat` |
-| `interval` | both | `60s` | How often to check |
-| `timeout` | both | `10s` | Request timeout |
+| `interval` | both | `60s` | How often to check. On a heartbeat this is how often its freshness is re-evaluated, not how often you have to ping — that is `period` |
+| `timeout` | both | `10s` | Request timeout. Only bites on HTTP |
 | `failures_before_alarm` | both | `2` | Consecutive failures that open an incident |
 | `failing_for` | both | — | Failure streak duration that opens an incident |
-| `degraded_ms` | both | — | Slower than this and the check counts as degraded, not down |
-| `notify` | both | inherits global | `ntfy` and/or `webhook` for this monitor |
-| `url` | http | — | What to request |
-| `method` | http | `GET` | HTTP method |
+| `degraded_ms` | both | — | Slower than this and a passing check counts as degraded, not down. Only bites on HTTP |
+| `notify` | both | inherits global | `ntfy` and/or `webhook` for this monitor, per target |
+| `url` | http | — | Required. What to request |
+| `method` | http | `GET` | Any HTTP method; upper-cased for you |
 | `headers` | http | — | Request headers |
 | `body` | http | — | Request body |
 | `expect_status` | http | `2xx` | `200`, `[200, 204]`, or a class like `2xx` |
-| `expect_body` | http | — | Substring the response body must contain |
-| `period` | heartbeat | — | How often the job is expected to ping |
-| `grace` | heartbeat | `0` | Extra slack before a missing ping counts |
-| `token` | heartbeat | — | Required on the ping if set |
+| `expect_body` | http | — | Substring the response body must contain. Only set it when you need it — it forces the body to be read, which counts toward latency |
+| `period` | heartbeat | — | Required. How often the job is expected to ping |
+| `grace` | heartbeat | `0` | Extra slack on top of `period` before a missing ping counts |
+| `token` | heartbeat | — | Required on the ping if set. Use `${VAR}` |
 
 Durations are `500ms`, `30s`, `5m`, `24h`, `2d`, or a bare number of seconds.
+
+Redirects are followed. Latency is measured after the body is read.
 
 ### Alarm rules
 
@@ -137,6 +160,14 @@ curl -fsS "https://uptime.example.workers.dev/ping/repowarden-daily-scan?token=$
 
 The token can also go in an `Authorization: Bearer` header. If no ping arrives
 within `period + grace`, an incident opens like any other failure.
+
+A heartbeat that has never been pinged records nothing and never alerts, so you
+can add one before the job is wired up. The first ping starts the clock — after
+that, silence is a failure. A one-off test ping counts, so do not send one until
+the job really is sending them.
+
+Ping last, after the job's work, and only on success. A run that throws then
+never pings, and the missing ping is what raises the alert.
 
 ## Notifications
 
@@ -173,6 +204,24 @@ A notification that fails is logged; it never blocks a check from recording.
 | `GET /api/status` | The same data as JSON, CORS-open |
 | `GET \| POST /ping/:id` | Heartbeat receiver |
 | `GET /health` | Liveness for the status page itself |
+| `GET /llms.txt` | The whole reference — endpoints, JSON shape, every config key — as plain text |
+
+### For agents
+
+`/api/status` is the machine-readable status: same data as the page, same
+query, CORS-open. `/llms.txt` describes it and the config format in one fetch,
+so an agent never has to scrape the HTML or read this repo. Both are linked
+from the footer of every page.
+
+```sh
+curl -s https://status.example.com/llms.txt
+curl -s https://status.example.com/api/status | jq '.monitors[] | {id, state, uptime}'
+```
+
+The JSON shape is documented in [`llms.txt`](llms.txt) — timestamps are Unix
+seconds UTC, `state` is `up | degraded | down | unknown`, `uptime` is a
+fraction over `windowDays` or `null` when nothing has been recorded, and `days`
+always holds `windowDays` entries oldest first.
 
 ## How it works
 
@@ -245,6 +294,9 @@ The page uses the Turbo Technologies design tokens, vendored in
 `src/tokens.css`. To rebrand a fork, replace that file with your own tokens —
 `src/app.css` only ever references the semantic `--tt-color-*` names, so nothing
 else needs touching.
+
+The "Run your own" section links back here via one `REPO` constant at the top of
+`src/page.ts`. Point it at your fork, or delete the section.
 
 ## Licence
 

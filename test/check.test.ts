@@ -125,6 +125,19 @@ describe("checkHeartbeat", () => {
     expect(s.ok).toBe(false);
     expect(s.error).toMatch(/no ping for/);
   });
+
+  // A 24h/2h monitor 31 hours late used to say "no ping for 1d (expected every
+  // 1d)": both numbers rounded to the same string, and it named the period
+  // rather than the deadline that actually tripped. That reads like the page
+  // wants more frequent pings than it does.
+  it("names the elapsed time and the deadline, distinguishably", () => {
+    const m = monitor("  - name: Job\n    type: heartbeat\n    period: 24h\n    grace: 2h\n") as Extract<
+      Monitor,
+      { type: "heartbeat" }
+    >;
+    const s = checkHeartbeat(m, now - 31 * 3600, now)!;
+    expect(s.error).toBe("no ping for 1d 7h, expected within 1d 2h");
+  });
 });
 
 describe("evaluate", () => {
@@ -178,6 +191,18 @@ describe("formatDuration", () => {
     expect(formatDuration(300)).toBe("5m");
     expect(formatDuration(7200)).toBe("2h");
     expect(formatDuration(172800)).toBe("2d");
+  });
+
+  // Past a day, rounding to whole days collapses every deadline in a 24-hour
+  // span onto the same string, which is exactly where heartbeat messages live.
+  it("keeps the hours once past a day", () => {
+    expect(formatDuration(93600)).toBe("1d 2h");
+    expect(formatDuration(111600)).toBe("1d 7h");
+    expect(formatDuration(180000)).toBe("2d 2h");
+  });
+
+  it("never reports 24 hours instead of a day", () => {
+    expect(formatDuration(86400 + 86340)).toBe("1d 23h");
   });
 });
 
