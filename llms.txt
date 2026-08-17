@@ -13,7 +13,11 @@ GET  /            The status page, HTML. Cached 30s.
 GET  /api/status  The same data as JSON. Cached 30s. `access-control-allow-origin: *`.
 GET  /ping/:id    Heartbeat receiver. POST works too. Returns 200 `ok`, 401 on a
                   bad token, 404 on an unknown or non-heartbeat id.
-GET  /health      Liveness for the status page itself. Returns 200 `ok`.
+GET  /health      Liveness for the status page itself, plus the version it runs.
+                  200 `{"status":"ok","version":"1.1.0",
+                  "latestMigration":"0002_prune_index.sql","migrationsApplied":true}`.
+                  503 with `"status":"degraded"` when the database has not had
+                  the newest migration applied.
 GET  /llms.txt    This file.
 
 Read `/api/status` rather than scraping the HTML. It is the same data the page
@@ -26,6 +30,7 @@ renders, from the same query.
   "title": "Acme Status",
   "description": "Live availability for everything we run.",
   "link": "https://acme.com",
+  "version": "1.1.0",
   "generatedAt": 1786172940,
   "windowDays": 90,
   "overall": "up",
@@ -90,7 +95,9 @@ clock: after that, silence is a failure.
 ## Configuration
 
 One file, `status.yaml`, bundled into the Worker at build time. Editing it means
-a deploy. `pnpm lint:config` validates it and names every problem.
+a deploy. `pnpm lint:config` validates it and names every problem. It starts as
+a copy of `status.example.yaml` and belongs to whoever runs the page — upstream
+does not track it, so an update cannot conflict with it.
 
 Any `${VAR}` in any string is replaced from the Worker's environment before
 validation, so secrets stay out of git. A referenced variable that is not set
@@ -249,14 +256,21 @@ monitors:
 ## Running your own
 
 ```sh
-git clone https://github.com/joshghent/uptime && cd uptime
+# fork it first, then
+git clone https://github.com/<you>/uptime && cd uptime
 pnpm install
+pnpm setup                         # status.yaml from status.example.yaml
 npx wrangler d1 create uptime      # copy database_id into wrangler.jsonc
 pnpm run db:migrate
-# edit status.yaml
+# edit status.yaml, then commit it — your fork owns it
 pnpm lint:config
 pnpm run deploy
 ```
+
+Updates come from upstream: `git remote add upstream
+https://github.com/joshghent/uptime.git`, then `git merge upstream/main`. A
+shipped workflow can open that as a weekly pull request instead. `status.yaml`
+is not tracked upstream, so an update never collides with your monitors.
 
 Cloudflare's free tier covers a handful of monitors. Full setup, custom domains,
 cost notes and development instructions are in the README:

@@ -1,0 +1,68 @@
+# Publishes a GitHub Release when a version tag is pushed.
+#
+#   1. bump "version" in package.json
+#   2. add the section to CHANGELOG.md
+#   3. git tag v1.2.0 && git push --tags
+#
+# The tag has to agree with package.json, because that is what the running
+# Worker reports on /health and in the footer. A tag that disagreed would make
+# every deployment lie about which release it is.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Tag matches package.json
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(jq -r .version package.json)"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::tag v$tag does not match package.json version $pkg"
+            exit 1
+          fi
+
+      # The same checks CI runs. A release that was never green is worse than a
+      # late one, and every fork is about to be offered this commit.
+      - run: pnpm typecheck
+      - run: pnpm lint:config
+        env:
+          NTFY_URL: https://ntfy.example/ci
+          HEARTBEAT_TOKEN: ci
+      - run: pnpm test
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          notes="$(awk -v v="$version" '
+            $1 == "##" && $2 == v { found = 1; next }
+            found && $1 == "##" { exit }
+            found { print }
+          ' CHANGELOG.md)"
+
+          if [ -z "$(printf '%s' "$notes" | tr -d '[:space:]')" ]; then
+            echo "::error::CHANGELOG.md has no section for $version"
+            exit 1
+          fi
+
+          printf '%s\n' "$notes" > notes.md
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md

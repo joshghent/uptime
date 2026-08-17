@@ -1,5 +1,9 @@
 # uptime
 
+[![CI](https://github.com/joshghent/uptime/actions/workflows/ci.yml/badge.svg)](https://github.com/joshghent/uptime/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/joshghent/uptime?sort=semver)](https://github.com/joshghent/uptime/releases)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
+
 A status page that runs on Cloudflare Workers and D1. Your monitors live in one
 YAML file, checked by a cron, rendered as a single server-side page.
 
@@ -15,9 +19,13 @@ through, no per-monitor pricing, no vendor holding your incident history.
 
 ## Quick start
 
+Fork this repository first, then clone your fork — updates arrive as a pull
+request against it, and your config lives there.
+
 ```sh
-git clone https://github.com/joshghent/uptime && cd uptime
+git clone https://github.com/<you>/uptime && cd uptime
 pnpm install
+pnpm setup                             # creates status.yaml and .dev.vars
 
 npx wrangler d1 create uptime          # copy the database_id into wrangler.jsonc
 pnpm run db:migrate                    # create the tables
@@ -25,6 +33,8 @@ pnpm run db:migrate                    # create the tables
 # edit status.yaml, then
 pnpm lint:config
 pnpm run deploy
+
+git add status.yaml && git commit -m "My monitors"   # your fork owns this file
 ```
 
 Your page is live at `https://uptime.<your-subdomain>.workers.dev`.
@@ -44,7 +54,12 @@ infrastructure with the thing it watches goes down at exactly the wrong moment.
 
 ## Configuration
 
-Everything lives in [`status.yaml`](status.yaml). Change it, deploy, done.
+Everything lives in `status.yaml`. Change it, deploy, done.
+
+That file is yours: this repository ships
+[`status.example.yaml`](status.example.yaml) as the template and does not track
+the copy you edit, so pulling an update can never collide with your monitors.
+Commit it to your fork — the deploy bundles it.
 
 ```yaml
 title: Acme Status
@@ -203,7 +218,7 @@ A notification that fails is logged; it never blocks a check from recording.
 | `GET /` | The status page |
 | `GET /api/status` | The same data as JSON, CORS-open |
 | `GET \| POST /ping/:id` | Heartbeat receiver |
-| `GET /health` | Liveness for the status page itself |
+| `GET /health` | Liveness, the version you are running, and whether the database is migrated |
 | `GET /llms.txt` | The whole reference — endpoints, JSON shape, every config key — as plain text |
 
 ### For agents
@@ -258,13 +273,63 @@ curl "http://localhost:8787/__scheduled?cron=*+*+*+*+*"
 
 ## Deploying
 
+`pnpm run deploy` applies migrations and then deploys, in that order, so the
+schema is never behind the code that reads it.
+
 Cloudflare Workers Builds deploys on every push to `main` once the repo is
-connected. Migrations are not applied automatically — run
-`pnpm run db:migrate` after any change to `migrations/`.
+connected. Set its deploy command to `pnpm run deploy` rather than the default
+`npx wrangler deploy`, so migrations travel with the code.
 
 To deploy from GitHub Actions instead, set the repo variable
 `DEPLOY_VIA_ACTIONS` to `true`, add a `CLOUDFLARE_API_TOKEN` secret, and turn
-Workers Builds off so the two don't race.
+Workers Builds off so the two don't race. That job migrates before deploying
+too.
+
+If a migration is ever missed, `/health` answers `503` and says which one is
+outstanding. Point a monitor at your own `/health` — the shipped example config
+has one — and the page tells you through the same alerts as everything else.
+
+## Updating
+
+Releases are tagged and published on the
+[releases page](https://github.com/joshghent/uptime/releases), with notes taken
+from [CHANGELOG.md](CHANGELOG.md). Anything you have to do by hand is under
+**Action required**, so read that before merging.
+
+Point your fork at upstream once:
+
+```sh
+git remote add upstream https://github.com/joshghent/uptime.git
+```
+
+Then, whenever you want the update:
+
+```sh
+git fetch upstream
+git merge upstream/main
+pnpm lint && pnpm test
+git push            # your deploy runs
+```
+
+Your `status.yaml` and the `database_id` in `wrangler.jsonc` are the only files
+you have changed, and upstream does not touch either, so the merge is normally
+a fast-forward with nothing to resolve.
+
+Prefer it to come to you? [`upstream-sync.yml`](.github/workflows/upstream-sync.yml)
+is already in your fork. Enable Actions on your fork, allow workflows to create
+pull requests (**Settings › Actions › General › Workflow permissions**), and it
+opens a "Sync from upstream" PR every Monday. Your CI runs against your own
+config on that PR, so you see it green before you merge — and merging is what
+deploys. Run it on demand from the Actions tab any time.
+
+Check what a running page is on:
+
+```sh
+curl -s https://status.example.com/health
+{"status":"ok","version":"1.1.0","latestMigration":"0002_prune_index.sql","migrationsApplied":true}
+```
+
+The version is in the page footer and in `/api/status` as well.
 
 ## How fast you hear about it
 
@@ -297,6 +362,12 @@ else needs touching.
 
 The "Run your own" section links back here via one `REPO` constant at the top of
 `src/page.ts`. Point it at your fork, or delete the section.
+
+## Contributing
+
+Issues and pull requests are welcome — [CONTRIBUTING.md](CONTRIBUTING.md) has
+the dev loop, the house style, and how migrations and releases work. Security
+issues go through [SECURITY.md](SECURITY.md), privately, not the issue tracker.
 
 ## Licence
 

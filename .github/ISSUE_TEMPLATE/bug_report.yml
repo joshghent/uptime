@@ -1,0 +1,56 @@
+name: Bug report
+description: Something behaves differently from how it is documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Found a security issue? Don't file it here — see [SECURITY.md](../blob/main/SECURITY.md).
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The `version` from your `/health`, or the one in the page footer.
+      placeholder: "1.1.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: The steps, and the smallest `status.yaml` that shows it. Redact your secrets and URLs.
+      render: yaml
+    validations:
+      required: true
+
+  - type: textarea
+    id: health
+    attributes:
+      label: Output of /health
+      description: "`curl -s https://your-page/health`. It reports the version and whether your migrations are applied."
+      render: json
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Worker logs
+      description: "`npx wrangler tail`, if the problem involves the cron or an alert."
+      render: shell
+
+  - type: checkboxes
+    id: checked
+    attributes:
+      label: Before filing
+      options:
+        - label: "`pnpm lint:config` passes on the config in question"
+        - label: I am on the latest release, or have read its notes
