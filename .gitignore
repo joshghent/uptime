@@ -1,3 +1,6 @@
+# status.yaml is deliberately NOT ignored: your fork has to commit it, because
+# the deploy bundles it. It is simply absent from this repository, which is
+# what keeps a merge from upstream away from your monitors.
 node_modules/
 .wrangler/
 .dev.vars

@@ -5,10 +5,12 @@
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
 
-  // A status page belongs on a domain the apps it watches don't serve, so an
-  // outage there cannot take the page with it. `custom_domain` makes wrangler
-  // create the DNS record on deploy; the zone has to already be in the account.
-  "routes": [{ "pattern": "status.turbotechnologies.co.uk", "custom_domain": true }],
+  // Your own domain goes here. A status page belongs on a domain the apps it
+  // watches don't serve, so an outage there cannot take the page with it.
+  // `custom_domain` makes wrangler create the DNS record on deploy; the zone
+  // has to already be in the account. Leave it commented to stay on workers.dev.
+  //
+  // "routes": [{ "pattern": "status.example.com", "custom_domain": true }],
 
   // Kept on so the workers.dev URL stays a working fallback if DNS or the
   // certificate ever has a bad day.
@@ -24,7 +26,9 @@
     {
       "binding": "DB",
       "database_name": "uptime",
-      "database_id": "9e65ec91-1221-4208-a292-28d48027148d",
+      // From `pnpm run db:create`. This one line is yours, not upstream's —
+      // it is the only thing in this file you have to change.
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
       "migrations_dir": "migrations"
     }
   ],

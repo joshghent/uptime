@@ -18,11 +18,27 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       # status.yaml references secrets by name only; any value proves the shape.
+      # If your config uses more `${VAR}`s than these, add them here — the lint
+      # names the one it could not resolve, so a red build tells you which.
       - run: pnpm lint:config
         env:
           NTFY_URL: https://ntfy.example/ci
           HEARTBEAT_TOKEN: ci
       - run: pnpm test
+
+  # Upstream only. status.yaml belongs to whoever runs the page: committing one
+  # here would drop it into the merge path of every fork, which is the whole
+  # thing this layout avoids.
+  config-not-tracked:
+    if: github.repository == 'joshghent/uptime'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          if git ls-files --error-unmatch status.yaml >/dev/null 2>&1; then
+            echo "::error::status.yaml is tracked upstream. Monitors belong in a fork; ship changes in status.example.yaml."
+            exit 1
+          fi
 
   # Cloudflare Workers Builds deploys on push by default. If you'd rather deploy
   # from Actions, set the repo variable DEPLOY_VIA_ACTIONS to "true" and add a
