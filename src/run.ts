@@ -2,6 +2,7 @@ import { checkHeartbeat, dayKey, evaluate, runHttpCheck, type Sample, type State
 import type { Config, Monitor } from "./config.ts";
 import * as db from "./db.ts";
 import { notify } from "./notify.ts";
+import { LATEST_MIGRATION } from "./version.ts";
 
 export type RunResult = {
   monitor: string;
@@ -60,6 +61,13 @@ export async function runChecks(
   if (Math.floor(now / 60) % 60 === 0) {
     await db.pruneSamples(d1, now - config.retainDays * 86400);
     await db.pruneDaily(d1, dayKey(now - 365 * 86400));
+
+    // Hourly, in the logs, alongside the 503 on /health. An update whose
+    // migration was never applied is otherwise completely silent until
+    // something reads a column that isn't there.
+    if (!(await db.migrationApplied(d1, LATEST_MIGRATION))) {
+      console.error(`migration ${LATEST_MIGRATION} has not been applied — run \`pnpm run db:migrate\``);
+    }
   }
   return results;
 }

@@ -4,6 +4,7 @@ import * as db from "./db.ts";
 import { esc, renderPage } from "./page.ts";
 import { runChecks } from "./run.ts";
 import { buildStatus } from "./status.ts";
+import { LATEST_MIGRATION, VERSION } from "./version.ts";
 import source from "../status.yaml";
 import llms from "../llms.txt";
 
@@ -58,7 +59,26 @@ app.get("/llms.txt", (c) =>
   c.text(llms, 200, { "cache-control": "public, max-age=3600", "access-control-allow-origin": "*" }),
 );
 
-app.get("/health", (c) => c.text("ok\n"));
+/**
+ * Liveness for the status page itself, and the version it is running.
+ *
+ * It answers 503 when the newest migration has not been applied, so pointing
+ * one monitor at your own `/health` turns "deployed the update, forgot the
+ * migration" into an ordinary incident with an ordinary alert.
+ */
+app.get("/health", async (c) => {
+  const applied = await db.migrationApplied(c.env.DB, LATEST_MIGRATION);
+  return c.json(
+    {
+      status: applied ? "ok" : "degraded",
+      version: VERSION,
+      latestMigration: LATEST_MIGRATION,
+      migrationsApplied: applied,
+    },
+    applied ? 200 : 503,
+    { "cache-control": "no-store", "access-control-allow-origin": "*" },
+  );
+});
 
 // One handler. A broken config is the failure people will actually hit, so it
 // gets a readable page instead of a stack trace.
