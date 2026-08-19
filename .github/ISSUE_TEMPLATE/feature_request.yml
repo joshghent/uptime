@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest something this should do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is a small status page on purpose. The best requests describe a
+        problem you actually hit, not a feature another tool has.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What were you trying to do when you wanted this?
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+      description: If it needs config, sketch the YAML.
+      render: yaml
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+      description: Existing options that nearly worked, and where they fell short.

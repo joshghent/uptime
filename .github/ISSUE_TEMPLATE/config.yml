@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or help setting it up
+    url: https://github.com/joshghent/uptime/discussions
+    about: Ask in Discussions. Configuration questions get answered faster there.
+  - name: Configuration reference
+    url: https://github.com/joshghent/uptime#configuration
+    about: Every key, its default and what it does. Also served at /llms.txt on a running page.
+  - name: Security vulnerability
+    url: https://github.com/joshghent/uptime/security/advisories/new
+    about: Report privately. Please do not open an issue.

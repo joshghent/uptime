@@ -1,0 +1,70 @@
+# Opens a pull request bringing your fork up to date with upstream, once a
+# week. Your CI runs on that PR, so you see the checks pass against your own
+# status.yaml before you merge — and merging is what deploys.
+#
+# It never runs on the upstream repository itself.
+#
+# Two repository settings this needs, both one-time:
+#   Settings > Actions > General > Workflow permissions
+#     - "Read and write permissions"
+#     - "Allow GitHub Actions to create and approve pull requests"
+# GitHub also disables scheduled workflows in a fork until you enable Actions
+# on the Actions tab, and pauses them again after 60 days without activity.
+#
+# Prefer to do it by hand? That works too, and needs no settings at all:
+#   git remote add upstream https://github.com/joshghent/uptime.git
+#   git fetch upstream && git merge upstream/main
+name: Sync from upstream
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays, 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    if: github.repository != 'joshghent/uptime'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge upstream and open a PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/joshghent/uptime.git
+          git fetch upstream main
+
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "Already up to date with upstream."
+            exit 0
+          fi
+
+          git checkout -B upstream-sync
+
+          # A conflict means a file you changed also changed upstream. That
+          # needs a human, so fail loudly rather than push a broken branch.
+          if ! git merge --no-edit upstream/main; then
+            git merge --abort
+            echo "::error::upstream/main conflicts with this fork. Merge it locally: git fetch upstream && git merge upstream/main"
+            exit 1
+          fi
+
+          git push --force-with-lease origin upstream-sync
+
+          gh pr create \
+            --base "$BASE" \
+            --head upstream-sync \
+            --title "Sync from upstream" \
+            --body "Brings this fork up to date with [joshghent/uptime](https://github.com/joshghent/uptime). Read the release notes for anything marked **Action required** — a release that adds a migration needs \`pnpm run db:migrate\` as well. Merging deploys." \
+            || echo "A sync PR is already open; its branch has been updated."

@@ -1,0 +1,23 @@
+# Grouped into one PR per ecosystem per week. A status page with four
+# dependencies does not need a pull request per patch bump, and a single PR
+# that CI has already run against is easier to judge than five.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      npm:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]

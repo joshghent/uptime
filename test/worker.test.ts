@@ -2,10 +2,12 @@ import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadConfig } from "../src/config.ts";
 import worker from "../src/index.ts";
+import { REPO } from "../src/page.ts";
+import { LATEST_MIGRATION, VERSION } from "../src/version.ts";
 import source from "../status.yaml";
 
-// Asserted against the real shipped config, so editing status.yaml cannot
-// silently break the page without a test noticing.
+// Asserted against your own status.yaml, so editing it cannot silently break
+// the page without a test noticing — on a fork as much as here.
 const config = loadConfig(source, env as unknown as Record<string, unknown>);
 const heartbeat = config.monitors.find((m) => m.type === "heartbeat");
 const http = config.monitors.find((m) => m.type === "http")!;
@@ -42,7 +44,11 @@ describe("GET /", () => {
   it("points at the source repo so a visitor can run their own", async () => {
     const html = await get("/").then((r) => r.text());
     expect(html).toContain("Run your own");
-    expect(html).toContain("https://github.com/joshghent/uptime");
+    expect(html).toContain(REPO);
+  });
+
+  it("shows the version it is running, so a bug report can name it", async () => {
+    expect(await get("/").then((r) => r.text())).toContain(`v${VERSION}`);
   });
 
   it("shows an incident banner while a monitor is down", async () => {
@@ -154,7 +160,25 @@ describe("scheduled", () => {
 });
 
 describe("GET /health", () => {
-  it("answers without touching the database", async () => {
-    expect(await get("/health").then((r) => r.text())).toBe("ok\n");
+  it("reports ok, the version, and the schema it expects", async () => {
+    const res = await get("/health");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      status: "ok",
+      version: VERSION,
+      latestMigration: LATEST_MIGRATION,
+      migrationsApplied: true,
+    });
+  });
+
+  // The point of the endpoint: a deploy whose migration was never applied is
+  // otherwise invisible until something reads a column that isn't there.
+  // Pointing a monitor at your own /health turns it into a normal incident.
+  it("answers 503 when the newest migration has not been applied", async () => {
+    await env.DB.exec(`DELETE FROM d1_migrations WHERE name = '${LATEST_MIGRATION}'`);
+
+    const res = await get("/health");
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ status: "degraded", migrationsApplied: false });
   });
 });

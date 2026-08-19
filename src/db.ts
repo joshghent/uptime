@@ -129,6 +129,24 @@ export function recordPing(db: D1Database, monitor: string, at: number) {
     .run();
 }
 
+/**
+ * Whether wrangler's migration ledger contains `name`.
+ *
+ * Any failure answers false: the table does not exist until the first
+ * `migrations apply`, and a database we cannot query is not one whose schema we
+ * can vouch for. Both are states `/health` should report rather than claim to
+ * be fine, so the error is logged and folded into the same answer.
+ */
+export async function migrationApplied(db: D1Database, name: string): Promise<boolean> {
+  try {
+    const row = await db.prepare(`SELECT 1 FROM d1_migrations WHERE name = ?`).bind(name).first();
+    return row !== null;
+  } catch (e) {
+    console.error("cannot read d1_migrations:", (e as Error).message);
+    return false;
+  }
+}
+
 export function pruneSamples(db: D1Database, before: number) {
   return db.prepare(`DELETE FROM samples WHERE ts < ?`).bind(before).run();
 }

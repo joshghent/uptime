@@ -8,7 +8,7 @@ const ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;"
 export const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ESCAPES[c]!);
 
 /** Where "run your own" points. One place, so a fork edits one line. */
-const REPO = "https://github.com/joshghent/uptime";
+export const REPO = "https://github.com/joshghent/uptime";
 
 const LABEL: Record<State, string> = {
   up: "Operational",
@@ -179,7 +179,7 @@ ${s.description ? `<meta name="description" content="${esc(s.description)}">` : 
       <span><i style="background:var(--tt-color-danger)"></i> Down</span>
       <span><i style="background:var(--tt-color-bg-emphasis)"></i> No data</span>
     </div>
-    <span>Last ${s.windowDays} days · <a href="/api/status">JSON</a> · <a href="/llms.txt">llms.txt</a> · <a href="${REPO}">Source</a></span>
+    <span>Last ${s.windowDays} days · <a href="/api/status">JSON</a> · <a href="/llms.txt">llms.txt</a> · <a href="${REPO}">Source</a> · v${esc(s.version)}</span>
   </footer>
 </main>
 </body>

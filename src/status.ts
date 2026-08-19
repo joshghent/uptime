@@ -2,6 +2,7 @@ import { dayRange, type State } from "./check.ts";
 import type { Config } from "./config.ts";
 import * as db from "./db.ts";
 import type { Incident } from "./db.ts";
+import { VERSION } from "./version.ts";
 
 export const WINDOW_DAYS = 90;
 
@@ -28,6 +29,8 @@ export type Status = {
   title: string;
   description?: string;
   link?: string;
+  /** Which release produced this page, so a bug report can name it. */
+  version: string;
   generatedAt: number;
   windowDays: number;
   overall: State;
@@ -101,6 +104,7 @@ export async function buildStatus(d1: D1Database, config: Config, now: number): 
     title: config.title,
     description: config.description,
     link: config.link,
+    version: VERSION,
     generatedAt: now,
     windowDays: WINDOW_DAYS,
     overall,
