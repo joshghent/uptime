@@ -7,6 +7,22 @@ you beyond merging — a migration, a config change, a new secret.
 Versions are semver against what an operator sees: a major means your config,
 your database or your deploy needs a hand.
 
+## 1.1.1 — 2026-08-19
+
+**Action required if you use the sync workflow.** It now needs a `SYNC_TOKEN`
+secret — a fine-grained PAT scoped to your fork with Contents, Pull requests and
+Workflows set to read and write. Without one it cannot carry an update that
+changes a workflow file, which this release does.
+
+### Fixed
+
+- The sync workflow could not push any update that touched
+  `.github/workflows/`. GitHub refuses that push from the built-in Actions
+  token, and no `permissions:` scope grants it, so every release that changed a
+  workflow would have failed on every fork. It uses `SYNC_TOKEN` when present
+  and explains itself when the push is refused. Merging by hand was never
+  affected: `git fetch upstream && git merge upstream/main`.
+
 ## 1.1.0 — 2026-08-17
 
 An update path. Until now a fork carried a permanent diff against upstream and
