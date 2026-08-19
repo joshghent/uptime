@@ -20,15 +20,15 @@
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
-    "hono": "^4.13.0",
+    "hono": "^4.13.2",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.20.2",
-    "@types/node": "^26.1.2",
-    "typescript": "^5.9.3",
+    "@cloudflare/vitest-pool-workers": "^0.21.3",
+    "@types/node": "^26.2.0",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10",
-    "wrangler": "^4.119.0"
+    "wrangler": "^4.123.0"
   }
 }
