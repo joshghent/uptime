@@ -2,6 +2,10 @@
 # reaches the deployed Worker — but there is no reason to keep it.
 overrides:
   undici: ">=7.29.0"
+  # vite pulls postcss, which pulls a nanoid whose custom generators can loop
+  # forever on size zero. Dev-only too, and dependabot cannot bump a transitive
+  # pnpm dependency on its own.
+  nanoid: "^3.3.18"
 
 # esbuild and workerd download platform binaries in a postinstall script.
 allowBuilds:

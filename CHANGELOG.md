@@ -52,6 +52,18 @@ that needs them.
 - `/health` used to return `ok\n` as plain text. A check asserting the body
   contains `ok` still passes; one comparing the whole body exactly does not.
 
+### Fixed
+
+- The sync workflow reported success when it could not open the pull request,
+  so a sync that never ran looked exactly like a sync with nothing to do. Only
+  an already-open PR is treated as benign now; anything else fails the job with
+  the real error. Note that "Allow GitHub Actions to create and approve pull
+  requests" is enforced at the account level as well as the repository level,
+  and the account setting wins.
+- Pinned `nanoid` past GHSA-mwcw-c2x4-8c55 with a pnpm override. It arrives
+  through vite and postcss, so it is dev-only and never reaches the deployed
+  Worker, and dependabot cannot bump a transitive pnpm dependency by itself.
+
 ## 1.0.0 — 2026-08-07
 
 First release. HTTP and heartbeat monitors, ntfy and webhook alerts, 90 days of
