@@ -39,7 +39,7 @@ jobs:
     if: github.repository != 'joshghent/uptime'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           # Falls back to GITHUB_TOKEN so the job still runs without a token;
