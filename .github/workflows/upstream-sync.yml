@@ -4,8 +4,12 @@
 #
 # It never runs on the upstream repository itself.
 #
-# Two repository settings this needs, both one-time:
-#   Settings > Actions > General > Workflow permissions
+# Settings this needs, all one-time. "Allow GitHub Actions to create and
+# approve pull requests" is enforced in two places and the account-level one
+# wins, so setting it only on the repository is not enough:
+#   github.com/settings/actions (your account)
+#     - "Allow GitHub Actions to create and approve pull requests"
+#   Settings > Actions > General > Workflow permissions (this repository)
 #     - "Read and write permissions"
 #     - "Allow GitHub Actions to create and approve pull requests"
 # GitHub also disables scheduled workflows in a fork until you enable Actions
@@ -62,9 +66,21 @@ jobs:
 
           git push --force-with-lease origin upstream-sync
 
-          gh pr create \
+          # An already-open PR is the one benign failure here. Anything else —
+          # most often the account-level "create and approve pull requests"
+          # setting being off — has to fail the job, or a sync that never
+          # happened looks exactly like a sync with nothing to do.
+          if gh pr create \
             --base "$BASE" \
             --head upstream-sync \
             --title "Sync from upstream" \
             --body "Brings this fork up to date with [joshghent/uptime](https://github.com/joshghent/uptime). Read the release notes for anything marked **Action required** — a release that adds a migration needs \`pnpm run db:migrate\` as well. Merging deploys." \
-            || echo "A sync PR is already open; its branch has been updated."
+            2>pr-error.txt; then
+            echo "Opened a sync PR."
+          elif grep -qi "already exists" pr-error.txt; then
+            echo "A sync PR is already open; its branch has been updated."
+          else
+            cat pr-error.txt
+            echo "::error::Could not open the sync PR. The upstream-sync branch is pushed, so you can open it by hand: https://github.com/$GITHUB_REPOSITORY/compare/$BASE...upstream-sync — if the message above says \"Resource not accessible by integration\", turn on \"Allow GitHub Actions to create and approve pull requests\" in BOTH your account settings (github.com/settings/actions) and this repository's Settings > Actions > General."
+            exit 1
+          fi
