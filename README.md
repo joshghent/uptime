@@ -316,12 +316,13 @@ you have changed, and upstream does not touch either, so the merge is normally
 a fast-forward with nothing to resolve.
 
 Prefer it to come to you? [`upstream-sync.yml`](.github/workflows/upstream-sync.yml)
-is already in your fork. Enable Actions on your fork and allow workflows to
-create pull requests — in **your account** at
-[github.com/settings/actions](https://github.com/settings/actions) *and* in the
-repository under **Settings › Actions › General › Workflow permissions**, since
-the account-level setting overrides the repository one. Then it opens a
-"Sync from upstream" PR every Monday. Your CI runs against your own
+is already in your fork. Enable Actions on your fork and give it a token: a
+[fine-grained PAT](https://github.com/settings/personal-access-tokens) scoped to
+that fork with **Contents**, **Pull requests** and **Workflows** set to read and
+write, stored as a `SYNC_TOKEN` secret (`gh secret set SYNC_TOKEN`). The token
+is required rather than a convenience — GitHub refuses to let the built-in
+Actions token push a change to any file under `.github/workflows/`, and updates
+here do change workflows. Then it opens a "Sync from upstream" PR every Monday. Your CI runs against your own
 config on that PR, so you see it green before you merge — and merging is what
 deploys. Run it on demand from the Actions tab any time.
 
