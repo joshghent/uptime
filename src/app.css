@@ -222,13 +222,42 @@ main { padding-block: var(--tt-space-8) var(--tt-space-12); }
   font-variant-numeric: tabular-nums;
 }
 
-/* -------------------------------------------------------------- incidents */
+/* ---------------------------------------------------------------- events */
 
 .section { margin-block-start: var(--tt-space-12); }
-.section > h2 { font-size: var(--tt-text-21); margin-block-end: var(--tt-space-4); }
+.section > h2, .section__head h2 { font-size: var(--tt-text-21); }
+.section > h2 { margin-block-end: var(--tt-space-4); }
 
-.incidents { list-style: none; padding: 0; border-block-start: 1px solid var(--tt-color-border); }
-.incident {
+/* Heading and the per-service filter share a row, and wrap onto two on a
+   phone rather than squeezing the select. */
+.section__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--tt-space-2) var(--tt-space-4);
+  margin-block-end: var(--tt-space-4);
+}
+
+/* A plain GET form — the page ships no JavaScript, so the filter is a submit
+   and the filtered view has a URL. */
+.filter { display: flex; align-items: center; gap: var(--tt-space-2); font-size: var(--tt-text-13); }
+.filter label { color: var(--tt-color-text-muted); }
+.filter select, .filter button {
+  font-family: inherit;
+  font-size: var(--tt-text-13);
+  color: var(--tt-color-text-primary);
+  background: var(--tt-color-surface);
+  border: 1px solid var(--tt-color-border);
+  border-radius: var(--tt-radius-sm);
+  padding: var(--tt-space-1) var(--tt-space-2);
+  max-width: 16rem;
+}
+.filter button { background: var(--tt-color-bg-muted); cursor: pointer; }
+.filter button:hover { background: var(--tt-color-bg-emphasis); }
+
+.events { list-style: none; padding: 0; border-block-start: 1px solid var(--tt-color-border); }
+.event {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--tt-space-2) var(--tt-space-4);
@@ -236,9 +265,33 @@ main { padding-block: var(--tt-space-8) var(--tt-space-12); }
   padding-block: var(--tt-space-4);
   border-block-end: 1px solid var(--tt-color-border);
 }
-.incident__name { font-weight: var(--tt-weight-medium); }
-.incident__reason { grid-column: 1 / -1; font-size: var(--tt-text-13); color: var(--tt-color-text-secondary); overflow-wrap: anywhere; }
-.incident__when { font-size: var(--tt-text-13); color: var(--tt-color-text-muted); font-variant-numeric: tabular-nums; text-align: right; }
+.event__name { font-weight: var(--tt-weight-medium); display: flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-2); }
+.event__reason { grid-column: 1 / -1; font-size: var(--tt-text-13); color: var(--tt-color-text-secondary); overflow-wrap: anywhere; }
+.event__when { font-size: var(--tt-text-13); color: var(--tt-color-text-muted); font-variant-numeric: tabular-nums; text-align: right; }
+
+.badge--incident, .badge--outage {
+  color: var(--tt-color-danger-text);
+  background: var(--tt-color-danger-bg);
+  border-color: var(--tt-color-danger-border);
+}
+.badge--degraded {
+  color: var(--tt-color-warning-text);
+  background: var(--tt-color-warning-bg);
+  border-color: var(--tt-color-warning-border);
+}
+
+/* The rest of the history, in place. No second page to load, and the list
+   underneath continues the one above it. */
+.more { margin-block-start: var(--tt-space-3); }
+.more > summary {
+  cursor: pointer;
+  width: fit-content;
+  font-size: var(--tt-text-13);
+  color: var(--tt-color-accent);
+  padding-block: var(--tt-space-1);
+}
+.more > summary:hover { color: var(--tt-color-accent-hover); }
+.more .events { border-block-start: none; margin-block-start: var(--tt-space-2); }
 
 .cta { gap: var(--tt-space-3); max-width: 60ch; }
 .cta p { color: var(--tt-color-text-secondary); }

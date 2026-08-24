@@ -73,6 +73,83 @@ describe("GET /", () => {
   });
 });
 
+describe("event history", () => {
+  const badDay = (monitor: string, daysAgo: number, fail = 1, degraded = 0) => {
+    const day = new Date((Date.now() - daysAgo * 86400_000)).toISOString().slice(0, 10);
+    return env.DB.prepare("INSERT INTO daily (monitor, day, ok, fail, degraded) VALUES (?, ?, 100, ?, ?)")
+      .bind(monitor, day, fail, degraded)
+      .run();
+  };
+
+  // The bug this section exists for: a day can be red or amber without an
+  // incident behind it, and the page used to show the colour and nothing else.
+  it("lists a bad day that never opened an incident", async () => {
+    await badDay(http.id, 1, 3);
+    const html = await get("/").then((r) => r.text());
+    expect(html).toContain("Event history");
+    expect(html).toContain("3 checks of 103 failed");
+  });
+
+  it("lists a slow day, which never opens an incident at all", async () => {
+    await badDay(http.id, 1, 0, 7);
+    expect(await get("/").then((r) => r.text())).toContain("Slow responses");
+  });
+
+  it("shows five events and puts the rest behind an expander", async () => {
+    for (let d = 1; d <= 8; d++) await badDay(http.id, d);
+    const html = await get("/").then((r) => r.text());
+
+    expect(html.match(/class="event event--/g)).toHaveLength(8);
+    // Five in the open list, the other three inside the details.
+    const [open] = html.split("<details");
+    expect(open!.match(/class="event event--/g)).toHaveLength(5);
+    expect(html).toContain("Show 3 older events");
+  });
+
+  it("filters the history to one service", async () => {
+    const other = config.monitors.find((m) => m.id !== http.id)!;
+    await badDay(http.id, 1);
+    await badDay(other.id, 2);
+
+    const html = await get(`/?monitor=${other.id}`).then((r) => r.text());
+    expect(html.match(/class="event event--/g)).toHaveLength(1);
+    expect(html).toContain(`<option value="${other.id}" selected>`);
+    // The cards are never filtered — the page still reports every service.
+    for (const m of config.monitors) expect(html).toContain(m.name);
+  });
+
+  it("says so when the filtered service has no events", async () => {
+    await badDay(http.id, 1);
+    const other = config.monitors.find((m) => m.id !== http.id)!;
+    const html = await get(`/?monitor=${other.id}`).then((r) => r.text());
+    expect(html).toContain(`No events for ${other.name} in the last 90 days.`);
+  });
+
+  it("ignores an unknown monitor rather than showing an empty page", async () => {
+    await badDay(http.id, 1);
+    const html = await get("/?monitor=nope").then((r) => r.text());
+    expect(html.match(/class="event event--/g)).toHaveLength(1);
+  });
+
+  it("has nothing to show on a clean window", async () => {
+    expect(await get("/").then((r) => r.text())).toContain("No events in the last 90 days.");
+  });
+});
+
+describe("uptime figure", () => {
+  it("is labelled with the days it was measured over, not the window length", async () => {
+    const day = new Date().toISOString().slice(0, 10);
+    await env.DB.prepare("INSERT INTO daily (monitor, day, ok, fail, degraded) VALUES (?, ?, 999, 1, 0)")
+      .bind(http.id, day)
+      .run();
+
+    const html = await get("/").then((r) => r.text());
+    // One day of data in a 90-day window: 99.90% over 1 day.
+    expect(html).toContain("99.90% over 1 day");
+    expect(html).not.toContain("99.90% uptime over the last 90 days");
+  });
+});
+
 describe("GET /llms.txt", () => {
   it("serves the reference as plain text, CORS-open", async () => {
     const res = await get("/llms.txt");
@@ -99,11 +176,17 @@ describe("GET /api/status", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
 
-    const body = (await res.json()) as { monitors: unknown[]; overall: string; windowDays: number };
+    const body = (await res.json()) as {
+      monitors: unknown[];
+      overall: string;
+      windowDays: number;
+      events: unknown[];
+    };
     expect(body.windowDays).toBe(90);
     expect(body.overall).toBe("unknown");
     expect(body.monitors).toHaveLength(config.monitors.length);
-    expect(body.monitors[0]).toMatchObject({ id: http.id, name: http.name, uptime: null });
+    expect(body.monitors[0]).toMatchObject({ id: http.id, name: http.name, uptime: null, observedDays: 0 });
+    expect(body.events).toEqual([]);
   });
 });
 

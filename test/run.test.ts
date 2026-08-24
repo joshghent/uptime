@@ -2,8 +2,9 @@ import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { loadConfig, type Config } from "../src/config.ts";
 import * as db from "../src/db.ts";
+import { dayKey } from "../src/check.ts";
 import { runChecks } from "../src/run.ts";
-import { buildStatus } from "../src/status.ts";
+import { buildStatus, dayStart, EVENT_LIMIT } from "../src/status.ts";
 
 const NOW = 1_800_000_000;
 
@@ -238,6 +239,18 @@ describe("buildStatus", () => {
     expect(m.days.at(-3)!.state).toBe("none");
   });
 
+  it("measures uptime over the days that have data, not the whole window", async () => {
+    const c = site();
+    await runChecks(env.DB, c, NOW - 86400, fakeFetch([new Response(null, { status: 200 })]).impl);
+    await runChecks(env.DB, c, NOW, fakeFetch([new Response(null, { status: 200 })]).impl);
+
+    const m = (await buildStatus(env.DB, c, NOW)).monitors[0]!;
+    // Two days of data inside a 90-day window: 100%, not 2/90.
+    expect(m.uptime).toBe(1);
+    expect(m.observedDays).toBe(2);
+    expect(m.days).toHaveLength(90);
+  });
+
   it("takes the worst monitor as the overall state", async () => {
     const c = config(`
   - name: Good
@@ -255,5 +268,114 @@ describe("buildStatus", () => {
     expect(s.monitors.find((m) => m.id === "good")!.state).toBe("up");
     expect(s.monitors.find((m) => m.id === "bad")!.state).toBe("down");
     expect(s.incidents.map((i) => i.monitor)).toEqual(["bad"]);
+  });
+});
+
+/**
+ * A red or amber bar does not imply an incident: a single failed check colours
+ * the day red without meeting `failures_before_alarm`, and a slow-but-passing
+ * check colours it amber and never alarms at all. The history is built from the
+ * same rollups the bars are, so every colour on the page has a row explaining it.
+ */
+describe("event history", () => {
+  const events = async (c: Config, now = NOW) => (await buildStatus(env.DB, c, now)).events;
+
+  /** Writes a rollup day directly — the shape a bar is drawn from. */
+  const day = (monitor: string, day: string, ok: number, fail: number, degraded = 0) =>
+    env.DB.prepare("INSERT INTO daily (monitor, day, ok, fail, degraded) VALUES (?, ?, ?, ?, ?)")
+      .bind(monitor, day, ok, fail, degraded)
+      .run();
+
+  const today = dayKey(NOW);
+  const yesterday = dayKey(NOW - 86400);
+
+  it("explains a failed day that never opened an incident", async () => {
+    await day("site", today, 1439, 1);
+
+    expect(await events(site())).toEqual([
+      {
+        monitor: "site",
+        name: "Site",
+        kind: "outage",
+        at: dayStart(today),
+        until: null,
+        day: today,
+        reason: "1 check of 1440 failed",
+      },
+    ]);
+  });
+
+  it("explains a slow day, which never alarms at all", async () => {
+    await day("site", today, 1440, 0, 12);
+
+    const [e] = await events(site());
+    expect(e).toMatchObject({ kind: "degraded", day: today });
+    expect(e!.reason).toContain("12 checks of 1440");
+  });
+
+  it("says nothing about a clean day", async () => {
+    await day("site", today, 1440, 0);
+    expect(await events(site())).toEqual([]);
+  });
+
+  it("reports an incident once, not again as a bad day", async () => {
+    const c = site();
+    await day("site", yesterday, 1400, 40);
+    await env.DB.prepare("INSERT INTO incidents (monitor, started_at, resolved_at, reason) VALUES (?, ?, ?, ?)")
+      .bind("site", NOW - 86400, NOW - 80000, "unexpected status 503")
+      .run();
+
+    const list = await events(c);
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ kind: "incident", reason: "unexpected status 503", until: NOW - 80000 });
+  });
+
+  it("keeps covering days for an incident that is still open", async () => {
+    await day("site", yesterday, 1400, 40);
+    await day("site", today, 700, 20);
+    await env.DB.prepare("INSERT INTO incidents (monitor, started_at, reason) VALUES (?, ?, ?)")
+      .bind("site", NOW - 86400, "down")
+      .run();
+
+    const list = await events(site());
+    expect(list.map((e) => e.kind)).toEqual(["incident"]);
+    expect(list[0]!.until).toBeNull();
+  });
+
+  it("orders newest first across monitors and carries the display name", async () => {
+    const c = config(`
+  - name: Good
+    url: https://site.test/good
+  - name: Bad
+    url: https://site.test/bad
+`);
+    await day("good", yesterday, 100, 1);
+    await day("bad", today, 100, 5);
+
+    expect((await events(c)).map((e) => [e.name, e.day])).toEqual([
+      ["Bad", today],
+      ["Good", yesterday],
+    ]);
+  });
+
+  it("caps each monitor's history so one noisy service cannot bury another", async () => {
+    const c = config(`
+  - name: Noisy
+    url: https://site.test/noisy
+  - name: Quiet
+    url: https://site.test/quiet
+`);
+    for (let i = 0; i < EVENT_LIMIT + 10; i++) await day("noisy", dayKey(NOW - i * 86400), 100, 1);
+    await day("quiet", dayKey(NOW - 80 * 86400), 100, 1);
+
+    const list = await events(c);
+    expect(list.filter((e) => e.monitor === "noisy")).toHaveLength(EVENT_LIMIT);
+    // The quiet monitor's single old event survives the noise.
+    expect(list.filter((e) => e.monitor === "quiet")).toHaveLength(1);
+  });
+
+  it("ignores days that fell out of the 90-day window", async () => {
+    await day("site", dayKey(NOW - 120 * 86400), 100, 5);
+    expect(await events(site())).toEqual([]);
   });
 });

@@ -1,6 +1,5 @@
 import type { State } from "./check.ts";
-import type { Incident } from "./db.ts";
-import type { Day, MonitorStatus, Status } from "./status.ts";
+import type { Day, EventKind, MonitorStatus, Status, StatusEvent } from "./status.ts";
 import tokensCss from "./tokens.css";
 import appCss from "./app.css";
 
@@ -10,11 +9,20 @@ export const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ESCAPES[c]!);
 /** Where "run your own" points. One place, so a fork edits one line. */
 export const REPO = "https://github.com/joshghent/uptime";
 
+/** How many events the page shows before the rest go behind "show older". */
+export const EVENTS_SHOWN = 5;
+
 const LABEL: Record<State, string> = {
   up: "Operational",
   degraded: "Degraded",
   down: "Down",
   unknown: "No data",
+};
+
+const KIND: Record<EventKind, string> = {
+  incident: "Incident",
+  outage: "Failed checks",
+  degraded: "Slow responses",
 };
 
 function ago(seconds: number): string {
@@ -24,6 +32,8 @@ function ago(seconds: number): string {
   return `${Math.floor(seconds / 86400)}d ago`;
 }
 
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
   month: "short",
@@ -32,6 +42,10 @@ const dateFmt = new Intl.DateTimeFormat("en-GB", {
   timeZone: "UTC",
 });
 const stamp = (unix: number) => `${dateFmt.format(new Date(unix * 1000))} UTC`;
+
+const dayFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+/** A rollup row covers a whole UTC day, so it gets a date and no clock time. */
+const dayStamp = (day: string) => dayFmt.format(new Date(`${day}T00:00:00Z`));
 
 /** Stroke 1.5, currentColor, inline — no icon dependency. */
 function icon(state: State): string {
@@ -54,12 +68,20 @@ function bar(d: Day, monitor: string): string {
   return `<span class="bar--${d.state}" title="${esc(monitor)} — ${d.day}: ${esc(detail)}"></span>`;
 }
 
-function card(m: MonitorStatus, now: number): string {
+function card(m: MonitorStatus, now: number, windowDays: number): string {
   const uptime = m.uptime === null ? "—" : `${(m.uptime * 100).toFixed(2)}%`;
+  // Named for what it is measured over. A monitor added on Tuesday has two days
+  // of data, and saying "over the last 90 days" about them is not true.
+  const measured =
+    m.uptime === null ? "no data yet" : `${uptime} over ${plural(m.observedDays, "day")}`;
+  const explain =
+    m.uptime === null
+      ? `${m.name} has recorded no checks yet`
+      : `Uptime counts only the days that recorded a check — ${m.observedDays} of the last ${windowDays}.`;
   const summary =
     m.uptime === null
       ? `${m.name}: no data recorded yet`
-      : `${m.name}: ${uptime} uptime over the last 90 days, currently ${LABEL[m.state].toLowerCase()}`;
+      : `${m.name}: ${uptime} uptime over ${plural(m.observedDays, "day")} with data, currently ${LABEL[m.state].toLowerCase()}`;
 
   return `<article class="card">
   <div class="card__head">
@@ -78,8 +100,8 @@ function card(m: MonitorStatus, now: number): string {
   }
   <div class="bars" role="img" aria-label="${esc(summary)}">${m.days.map((d) => bar(d, m.name)).join("")}</div>
   <div class="bars__scale">
-    <span><span class="wide">90</span><span class="narrow">30</span> days ago</span>
-    <span class="tt-numeric">${uptime} uptime</span>
+    <span><span class="wide">${windowDays}</span><span class="narrow">30</span> days ago</span>
+    <span class="tt-numeric" title="${esc(explain)}">${measured}</span>
     <span>Today</span>
   </div>
   <div class="card__foot">
@@ -115,17 +137,74 @@ function banner(s: Status): string {
 </section>`;
 }
 
-function incidentRow(i: Incident, names: Map<string, string>): string {
-  const duration = i.resolved_at === null ? "ongoing" : `lasted ${ago(i.resolved_at - i.started_at).replace(" ago", "")}`;
-  return `<li class="incident">
-  <span class="incident__name">${esc(names.get(i.monitor) ?? i.monitor)}</span>
-  <span class="incident__when">${stamp(i.started_at)} · ${duration}</span>
-  <span class="incident__reason">${esc(i.reason)}</span>
+function eventRow(e: StatusEvent): string {
+  const when =
+    e.kind === "incident"
+      ? `${stamp(e.at)} · ${e.until === null ? "ongoing" : `lasted ${ago(e.until - e.at).replace(" ago", "")}`}`
+      : dayStamp(e.day!);
+
+  return `<li class="event event--${e.kind}">
+  <span class="event__name">${esc(e.name)} <span class="badge badge--${e.kind}">${KIND[e.kind]}</span></span>
+  <span class="event__when">${when}</span>
+  <span class="event__reason">${esc(e.reason)}</span>
 </li>`;
 }
 
-export function renderPage(s: Status): string {
-  const names = new Map(s.monitors.map((m) => [m.id, m.name]));
+const list = (events: StatusEvent[]) => `<ul class="events">${events.map(eventRow).join("\n")}</ul>`;
+
+/**
+ * The per-service filter is a plain GET form: no client JavaScript on a page
+ * that is otherwise entirely server-rendered, and the filtered view has a URL
+ * you can send to someone.
+ */
+function filter(s: Status, selected: string | null): string {
+  if (s.monitors.length < 2) return "";
+  const option = (value: string, label: string) =>
+    `<option value="${esc(value)}"${value === (selected ?? "") ? " selected" : ""}>${esc(label)}</option>`;
+
+  return `<form class="filter" method="get" action="/#history">
+  <label for="monitor">Service</label>
+  <select id="monitor" name="monitor">
+    ${option("", "All services")}
+    ${s.monitors.map((m) => option(m.id, m.name)).join("\n    ")}
+  </select>
+  <button type="submit">Filter</button>
+</form>`;
+}
+
+function history(s: Status, selected: string | null): string {
+  const events = selected === null ? s.events : s.events.filter((e) => e.monitor === selected);
+  const name = s.monitors.find((m) => m.id === selected)?.name;
+  const shown = events.slice(0, EVENTS_SHOWN);
+  const rest = events.slice(EVENTS_SHOWN);
+
+  const body =
+    events.length === 0
+      ? `<p class="empty">No events${name ? ` for ${esc(name)}` : ""} in the last ${s.windowDays} days.${
+          name ? ` <a href="/#history">Show all services</a>` : ""
+        }</p>`
+      : `${list(shown)}
+    ${
+      rest.length === 0
+        ? ""
+        : `<details class="more">
+      <summary>Show ${plural(rest.length, "older event")}</summary>
+      ${list(rest)}
+    </details>`
+    }`;
+
+  return `<section class="section" id="history">
+    <div class="section__head">
+      <h2>Event history</h2>
+      ${filter(s, selected)}
+    </div>
+    ${body}
+  </section>`;
+}
+
+/** `monitor` filters the history to one service; an unknown id is ignored. */
+export function renderPage(s: Status, monitor?: string | null): string {
+  const selected = s.monitors.some((m) => m.id === monitor) ? monitor! : null;
   const title = esc(s.title);
 
   return `<!doctype html>
@@ -150,16 +229,9 @@ ${s.description ? `<meta name="description" content="${esc(s.description)}">` : 
 <main class="tt-container">
   ${s.description ? `<p class="lede tt-muted">${esc(s.description)}</p>` : ""}
   ${banner(s)}
-  <div class="monitors" id="monitors">${s.monitors.map((m) => card(m, s.generatedAt)).join("\n")}</div>
+  <div class="monitors" id="monitors">${s.monitors.map((m) => card(m, s.generatedAt, s.windowDays)).join("\n")}</div>
 
-  <section class="section">
-    <h2>Incident history</h2>
-    ${
-      s.incidents.length === 0
-        ? `<p class="empty">No incidents in the last ${s.windowDays} days.</p>`
-        : `<ul class="incidents">${s.incidents.map((i) => incidentRow(i, names)).join("\n")}</ul>`
-    }
-  </section>
+  ${history(s, selected)}
 
   <section class="section">
     <h2>Run your own</h2>

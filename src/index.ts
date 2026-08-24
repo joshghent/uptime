@@ -25,7 +25,11 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.get("/", async (c) => {
   const status = await buildStatus(c.env.DB, getConfig(c.env), now());
-  return c.html(renderPage(status), 200, { "cache-control": "public, max-age=30" });
+  // `?monitor=` filters the event history to one service. The page validates
+  // it against the config, so an unknown id renders the unfiltered page.
+  return c.html(renderPage(status, c.req.query("monitor")), 200, {
+    "cache-control": "public, max-age=30",
+  });
 });
 
 app.get("/api/status", async (c) => {

@@ -9,7 +9,8 @@ reference: endpoints, JSON shape, and every configuration key.
 
 ## Endpoints
 
-GET  /            The status page, HTML. Cached 30s.
+GET  /            The status page, HTML. Cached 30s. `?monitor=<id>` filters the
+                  event history to one service; an unknown id is ignored.
 GET  /api/status  The same data as JSON. Cached 30s. `access-control-allow-origin: *`.
 GET  /ping/:id    Heartbeat receiver. POST works too. Returns 200 `ok`, 401 on a
                   bad token, 404 on an unknown or non-heartbeat id.
@@ -42,6 +43,7 @@ renders, from the same query.
       "type": "http",
       "state": "up",
       "uptime": 0.9998,
+      "observedDays": 12,
       "days": [{ "day": "2026-05-11", "state": "up", "ok": 1440, "fail": 0, "degraded": 0 }],
       "lastCheck": 1786172933,
       "lastError": null,
@@ -56,6 +58,26 @@ renders, from the same query.
       "resolved_at": null,
       "reason": "unexpected status 503"
     }
+  ],
+  "events": [
+    {
+      "monitor": "api",
+      "name": "API",
+      "kind": "incident",
+      "at": 1786153013,
+      "until": null,
+      "day": null,
+      "reason": "unexpected status 503"
+    },
+    {
+      "monitor": "api",
+      "name": "API",
+      "kind": "outage",
+      "at": 1786060800,
+      "until": null,
+      "day": "2026-05-09",
+      "reason": "2 checks of 1440 failed"
+    }
   ]
 }
 ```
@@ -67,14 +89,29 @@ Field notes:
 - `state` is one of `up`, `degraded`, `down`, `unknown`. `degraded` means either
   the last check was slower than `degraded_ms`, or the monitor is failing but
   has not yet met its alarm rule.
-- `uptime` is a fraction 0-1 over `windowDays`, computed as
-  `passed / (passed + failed)`. It is `null` when nothing has been recorded.
+- `uptime` is a fraction 0-1 computed as `passed / (passed + failed)` over the
+  days that recorded a check, not over `windowDays` — a monitor added yesterday
+  reports on its one day of data rather than being penalised for the 89 before
+  it existed. `observedDays` says how many days that was. `uptime` is `null` and
+  `observedDays` is 0 when nothing has been recorded.
 - `days` always has `windowDays` entries, oldest first, one per UTC day. A day's
   `state` is `none` when no check ran, `down` if any check failed, `degraded` if
   any was slow, otherwise `up`.
 - `incident` is the monitor's currently open incident, or `null`.
 - `incidents` covers the whole window, newest first, open and resolved.
   `resolved_at` is `null` while an incident is open.
+- `events` is the history the page renders, newest first: every incident, plus
+  every day that had a failed or a slow check without an incident to explain it.
+  A day goes red on a single failed check and amber on a single slow one, and
+  neither has to meet `failures_before_alarm`, so the rollup rows are what make
+  a coloured bar traceable to something.
+  - `kind` is `incident` (from the incidents table), `outage` (a day with failed
+    checks) or `degraded` (a day whose checks passed but were slow).
+  - `at` is the incident's start, or 00:00 UTC of the day for a rollup row.
+    `until` is the incident's end, `null` while open and always `null` for a
+    rollup row. `day` is set on rollup rows only.
+  - Days already covered by an incident do not get a second row.
+  - Capped at 50 rows per monitor, so one noisy service cannot bury the rest.
 
 ## Heartbeats
 
