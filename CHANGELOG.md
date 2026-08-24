@@ -7,6 +7,33 @@ you beyond merging — a migration, a config change, a new secret.
 Versions are semver against what an operator sees: a major means your config,
 your database or your deploy needs a hand.
 
+## 1.2.0 — 2026-08-24
+
+No action required. Merge and deploy; there is no migration and no config
+change.
+
+### Added
+
+- **Event history.** The section that was "Incident history" now lists the days
+  behind every coloured bar, not just the incidents. A bar goes red on a single
+  failed check and amber on a single slow one, and neither has to meet
+  `failures_before_alarm` — so a page could show a week of red and amber with an
+  empty incident list and no way to find out what happened. Days an incident
+  already covers are not listed twice.
+- The history shows five entries and expands to the rest in place, and filters
+  to one service with `?monitor=<id>`. Both are plain HTML — no client
+  JavaScript, and a filtered view has a URL you can send someone.
+- `/api/status` gained `events` (the same history, newest first, capped at 50
+  rows per monitor) and `monitors[].observedDays`.
+
+### Fixed
+
+- A monitor's uptime read `99.98% uptime` under a "90 days ago … Today" scale
+  even when it had two days of data. The figure itself never counted the empty
+  days — it is `passed / (passed + failed)` and always was — but nothing on the
+  page said what it was measured over. It now reads `99.98% over 2 days`, and
+  the API says so as `observedDays`.
+
 ## 1.1.1 — 2026-08-19
 
 **Action required if you use the sync workflow.** It now needs a `SYNC_TOKEN`

@@ -13,7 +13,7 @@ through, no per-monitor pricing, no vendor holding your incident history.
 - HTTP/HTTPS checks with status, body and latency assertions
 - Heartbeat monitors: your cron pings *us*, and a missed ping is an incident
 - Alerts to [ntfy](https://ntfy.sh) and any webhook, globally or per monitor
-- 90 days of uptime bars, incident history, and a JSON API
+- 90 days of uptime bars, a filterable event history, and a JSON API
 - `/llms.txt` and a CORS-open JSON API, so an agent reads it in one fetch
 - One config file, linted before you deploy
 
@@ -215,7 +215,7 @@ A notification that fails is logged; it never blocks a check from recording.
 
 | Path | What |
 |---|---|
-| `GET /` | The status page |
+| `GET /` | The status page. `?monitor=<id>` filters the event history to one service |
 | `GET /api/status` | The same data as JSON, CORS-open |
 | `GET \| POST /ping/:id` | Heartbeat receiver |
 | `GET /health` | Liveness, the version you are running, and whether the database is migrated |
@@ -234,9 +234,10 @@ curl -s https://status.example.com/api/status | jq '.monitors[] | {id, state, up
 ```
 
 The JSON shape is documented in [`llms.txt`](llms.txt) — timestamps are Unix
-seconds UTC, `state` is `up | degraded | down | unknown`, `uptime` is a
-fraction over `windowDays` or `null` when nothing has been recorded, and `days`
-always holds `windowDays` entries oldest first.
+seconds UTC, `state` is `up | degraded | down | unknown`, `uptime` is a fraction
+over the days that recorded a check (`observedDays`) or `null` when nothing has
+been recorded, `days` always holds `windowDays` entries oldest first, and
+`events` is the history the page renders.
 
 ## How it works
 
@@ -250,10 +251,17 @@ page has been running, and lets raw samples be pruned after `retain_days`.
 
 A day bar is red if any check failed that day, yellow if any was degraded, green
 if all passed, and grey if nothing ran. Uptime is `passed / (passed + failed)`
-across the window.
+over the days that recorded a check — a monitor you added yesterday reports on
+its one day of data, not on 89 days that predate it.
 
 Incidents are rows in `incidents` with a partial unique index, so a monitor can
 only ever have one open at a time — no duplicate alerts if a cron overlaps.
+
+The event history is built from both. An incident needs its alarm rule to trip;
+a bar goes red on a single failed check and yellow on a single slow one, neither
+of which alarms. So the history lists incidents *and* the bad days no incident
+covers, which is what makes every colour on the page traceable to a row. It
+shows five, expands to the rest in place, and filters to one service.
 
 ## Development
 
