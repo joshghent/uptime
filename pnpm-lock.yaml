@@ -13,8 +13,8 @@ importers:
   .:
     dependencies:
       hono:
-        specifier: ^4.13.0
-        version: 4.13.0
+        specifier: ^4.13.5
+        version: 4.13.5
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
@@ -638,8 +638,8 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
 
-  hono@4.13.0:
-    resolution: {integrity: sha512-jhunvfHWxd7J5EFfSgH4xsYJzSe/lfqbUCxiyyeaQasUsXeEHXtzVid+7EOGByc5JnFa23SSFL3Y2RV/z1T+eQ==}
+  hono@4.13.5:
+    resolution: {integrity: sha512-O6+/eCYRkzzzy0rPWwKLiGBR1nFuUPZynnwjxN1MBA62NNqbT0wQEzQyK2gSO5yDIDB336sXQleAhOHrzlYyKw==}
     engines: {node: '>=16.9.0'}
 
   kleur@4.1.5:
@@ -1367,7 +1367,7 @@ snapshots:
   fsevents@2.3.3:
     optional: true
 
-  hono@4.13.0: {}
+  hono@4.13.5: {}
 
   kleur@4.1.5: {}
 
