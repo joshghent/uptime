@@ -11,6 +11,10 @@
 #   npx wrangler secret put NTFY_URL
 # and from `.dev.vars` when you run locally.
 
+# The shape of this file. Older shapes keep working: a release that changes it
+# upgrades yours in memory, so an update never needs you to edit this.
+version: 1
+
 title: Acme Status
 description: Live availability for everything we run.
 link: https://acme.com

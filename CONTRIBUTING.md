@@ -61,6 +61,18 @@ for a while after the new one has migrated, and a `DROP` in that window takes
 their page down. Keep each one to plain statements separated by `;`, with no
 `;` or `--` inside a string: the Worker splits them without a SQL parser.
 
+## Changing status.yaml
+
+Updates reach deployments without anyone editing their config, so a change to
+the file's shape must not break the file they already have:
+
+- Adding an optional key is always fine.
+- Renaming, restructuring or changing the meaning of a key bumps
+  `CONFIG_VERSION` in `src/config.ts` and adds an upgrader to `UPGRADES` that
+  rewrites the previous version into the new one. Test it against a file in
+  the old shape.
+- Removing something with no automatic replacement is a major release.
+
 Anything an operator has to do by hand goes in the CHANGELOG under **Action
 required**.
 

@@ -145,6 +145,7 @@ fails the lint and the deploy, naming the variable. Set them with
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
+| `version` | int | `1` | Which shape of this file it is. Older versions are upgraded in memory, so an update never requires editing it |
 | `title` | string | `Status` | Page title and header |
 | `description` | string | — | Sub-line under the header and the meta description |
 | `link` | URL | — | Where the header logo links; usually your product |

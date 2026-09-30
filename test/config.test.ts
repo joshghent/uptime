@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ConfigError, loadConfig, parseDuration, slug } from "../src/config.ts";
+import { CONFIG_VERSION, ConfigError, loadConfig, parseDuration, slug } from "../src/config.ts";
 
 const minimal = `
 monitors:
@@ -42,6 +42,27 @@ describe("slug", () => {
     expect(slug("My Site")).toBe("my-site");
     expect(slug("API (v2)")).toBe("api-v2");
     expect(slug("  Checkout!  ")).toBe("checkout");
+  });
+});
+
+describe("version", () => {
+  it("defaults to 1 when the file does not say", () => {
+    expect(() => loadConfig(minimal)).not.toThrow();
+  });
+
+  it("accepts the current version", () => {
+    expect(() => loadConfig(`version: ${CONFIG_VERSION}\n${minimal}`)).not.toThrow();
+  });
+
+  it("names the fix when the file is newer than the package", () => {
+    expect(problems(`version: ${CONFIG_VERSION + 1}\n${minimal}`)).toEqual([
+      `version: ${CONFIG_VERSION + 1} is newer than this release understands (${CONFIG_VERSION}) — update @joshghent/uptime`,
+    ]);
+  });
+
+  it("rejects a version that is not a positive whole number", () => {
+    expect(problems(`version: 0\n${minimal}`)[0]).toMatch(/^version:/);
+    expect(problems(`version: two\n${minimal}`)[0]).toMatch(/^version:/);
   });
 });
 
