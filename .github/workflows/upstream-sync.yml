@@ -1,6 +1,12 @@
-# Opens a pull request bringing your fork up to date with upstream, once a
-# week. Your CI runs on that PR, so you see the checks pass against your own
-# status.yaml before you merge — and merging is what deploys.
+# Keeps your fork up to date with upstream, once a week. It opens a pull
+# request, waits for your own CI to pass on it — against your own status.yaml —
+# and merges it, which deploys. You only hear about an update when it needs
+# you: a release marked **Action required** in CHANGELOG.md (a migration, a new
+# secret), a merge conflict, or a red build. Those stay open for you to finish.
+#
+# To review every update yourself instead, set the repository variable
+# SYNC_AUTO_MERGE to "false" (Settings > Secrets and variables > Actions >
+# Variables) and it will only open the pull request.
 #
 # It never runs on the upstream repository itself.
 #
@@ -38,6 +44,8 @@ jobs:
   sync:
     if: github.repository != 'joshghent/uptime'
     runs-on: ubuntu-latest
+    # Most of this is waiting for your CI on the sync PR.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,6 +55,7 @@ jobs:
           token: ${{ secrets.SYNC_TOKEN || github.token }}
 
       - name: Merge upstream and open a PR
+        id: sync
         env:
           GH_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
           HAS_TOKEN: ${{ secrets.SYNC_TOKEN != '' }}
@@ -63,6 +72,7 @@ jobs:
             exit 0
           fi
 
+          echo "before=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           git checkout -B upstream-sync
 
           # A conflict means a file you changed also changed upstream. That
@@ -94,8 +104,58 @@ jobs:
             echo "Opened a sync PR."
           elif grep -qi "already exists" pr-error.txt; then
             echo "A sync PR is already open; its branch has been updated."
+          elif [ "$HAS_TOKEN" != "true" ]; then
+            cat pr-error.txt
+            echo "::error::Could not open the sync PR because this fork has no SYNC_TOKEN secret, and the built-in token is not allowed to. Create one as described at the top of .github/workflows/upstream-sync.yml, then run this workflow again from the Actions tab."
+            exit 1
           else
             cat pr-error.txt
             echo "::error::Could not open the sync PR. The upstream-sync branch is pushed, so you can open it by hand: https://github.com/$GITHUB_REPOSITORY/compare/$BASE...upstream-sync — if the message above says \"Resource not accessible by integration\", turn on \"Allow GitHub Actions to create and approve pull requests\" in BOTH your account settings (github.com/settings/actions) and this repository's Settings > Actions > General."
             exit 1
           fi
+          echo "pr=open" >> "$GITHUB_OUTPUT"
+
+      # Merges only what a release says is safe to merge unattended, and only
+      # once your own checks agree. A PR made with SYNC_TOKEN triggers your CI
+      # like any other; one made with the built-in token would not, which is
+      # one more reason the token is required.
+      - name: Merge the sync PR once your CI passes
+        if: steps.sync.outputs.pr == 'open' && vars.SYNC_AUTO_MERGE != 'false'
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+          BEFORE: ${{ steps.sync.outputs.before }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::Not merging: automatic updates need a SYNC_TOKEN secret. The PR is open for you to merge."
+            exit 0
+          fi
+
+          if git diff "$BEFORE" upstream-sync -- CHANGELOG.md | grep '^+' | grep -q '\*\*Action required'; then
+            gh pr comment upstream-sync --body "Not merged automatically: this update includes a release marked **Action required**. Do what its CHANGELOG entry says, then merge — merging deploys."
+            echo "::notice::Left open: a release in this update is marked Action required."
+            exit 0
+          fi
+
+          # Checks appear a few seconds after the push. None at all within five
+          # minutes means CI is not running on this fork, and nothing has
+          # vouched for the update — so it is not merged.
+          count=0
+          for _ in $(seq 1 30); do
+            count=$(gh pr checks upstream-sync --json name --jq length 2>/dev/null || echo 0)
+            [ "$count" -gt 0 ] && break
+            sleep 10
+          done
+          if [ "$count" -eq 0 ]; then
+            echo "::error::No checks ran on the sync PR, so it was not merged. Enable Actions for this fork (Actions tab), or merge the PR by hand."
+            exit 1
+          fi
+
+          if ! gh pr checks upstream-sync --watch --fail-fast --interval 20; then
+            echo "::error::Your CI failed on the sync PR, so it was not merged. The PR is open with the failing check."
+            exit 1
+          fi
+
+          gh pr merge upstream-sync --merge --delete-branch
+          echo "Merged — your deploy runs from here."

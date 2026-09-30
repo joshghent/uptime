@@ -306,9 +306,13 @@ pnpm run deploy
 ```
 
 Updates come from upstream: `git remote add upstream
-https://github.com/joshghent/uptime.git`, then `git merge upstream/main`. A
-shipped workflow can open that as a weekly pull request instead. `status.yaml`
-is not tracked upstream, so an update never collides with your monitors.
+https://github.com/joshghent/uptime.git`, then `git merge upstream/main`. Or
+automatically: the shipped `upstream-sync.yml` merges each release every Monday
+once the fork's own CI passes, and holds anything marked **Action required**. It
+needs Actions enabled on the fork and a `SYNC_TOKEN` secret — a fine-grained
+token for the fork with Contents, Pull requests and Workflows read/write. When
+setting up a fork for someone, do both. `status.yaml` is not tracked upstream,
+so an update never collides with your monitors.
 
 Cloudflare's free tier covers a handful of monitors. Full setup, custom domains,
 cost notes and development instructions are in the README:

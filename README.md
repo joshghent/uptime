@@ -39,6 +39,23 @@ git add status.yaml && git commit -m "My monitors"   # your fork owns this file
 
 Your page is live at `https://uptime.<your-subdomain>.workers.dev`.
 
+**Turn on automatic updates** — two steps, once. Without them your fork never
+hears about a release:
+
+1. Open your fork's **Actions** tab and enable workflows. GitHub switches them
+   off in every new fork.
+2. Create a [fine-grained token](https://github.com/settings/personal-access-tokens)
+   for just your fork, with **Contents**, **Pull requests** and **Workflows**
+   set to read and write, and store it:
+
+   ```sh
+   gh secret set SYNC_TOKEN -R <you>/uptime
+   ```
+
+From then on, every Monday your fork merges the latest release once your own
+CI passes on it, and the merge deploys. See [Updating](#updating) for what it
+leaves for you.
+
 To put it on your own domain, add a route to `wrangler.jsonc` and deploy again —
 wrangler creates the DNS record for you, as long as the zone is already in the
 same Cloudflare account:
@@ -325,16 +342,27 @@ Your `status.yaml` and the `database_id` in `wrangler.jsonc` are the only files
 you have changed, and upstream does not touch either, so the merge is normally
 a fast-forward with nothing to resolve.
 
-Prefer it to come to you? [`upstream-sync.yml`](.github/workflows/upstream-sync.yml)
-is already in your fork. Enable Actions on your fork and give it a token: a
-[fine-grained PAT](https://github.com/settings/personal-access-tokens) scoped to
-that fork with **Contents**, **Pull requests** and **Workflows** set to read and
-write, stored as a `SYNC_TOKEN` secret (`gh secret set SYNC_TOKEN`). The token
-is required rather than a convenience — GitHub refuses to let the built-in
-Actions token push a change to any file under `.github/workflows/`, and updates
-here do change workflows. Then it opens a "Sync from upstream" PR every Monday. Your CI runs against your own
-config on that PR, so you see it green before you merge — and merging is what
-deploys. Run it on demand from the Actions tab any time.
+Or let it happen on its own. [`upstream-sync.yml`](.github/workflows/upstream-sync.yml)
+is already in your fork, and once it is set up (the two steps under
+[Quick start](#quick-start): enable Actions, add a `SYNC_TOKEN`) it runs every
+Monday:
+
+1. merges upstream into an `upstream-sync` branch and opens a "Sync from
+   upstream" pull request,
+2. waits for your own CI to pass on it — against your own `status.yaml`,
+3. merges it, which deploys.
+
+It stops and leaves the pull request open for you when an update needs a
+person: a release marked **Action required** (a migration, a new secret — the
+PR gets a comment saying so), a merge conflict, or a failing check. The last
+two fail the workflow run, so GitHub emails you.
+
+The token is required rather than a convenience: GitHub refuses to let the
+built-in Actions token push a change under `.github/workflows/`, which updates
+here do make, and a pull request it opens would not trigger your CI. To review
+every update yourself instead, set the repository variable `SYNC_AUTO_MERGE` to
+`false` and it will only open the pull request. Run it on demand from the
+Actions tab any time.
 
 Check what a running page is on:
 

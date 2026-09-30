@@ -7,6 +7,28 @@ you beyond merging — a migration, a config change, a new secret.
 Versions are semver against what an operator sees: a major means your config,
 your database or your deploy needs a hand.
 
+## 1.4.0 — 2026-09-30
+
+No action required if your fork already has a `SYNC_TOKEN`; this arrives as a
+sync pull request like any other. If it does not, see below — that is why you
+have not been getting updates.
+
+### Added
+
+- **Updates merge themselves.** The weekly sync now waits for your own CI to
+  pass on its pull request and merges it, which deploys. It still stops for a
+  person when a release is marked **Action required**, when the merge
+  conflicts, or when a check fails. Set the repository variable
+  `SYNC_AUTO_MERGE` to `false` to keep reviewing each one by hand.
+
+### Fixed
+
+- The Quick start now says what automatic updates need — enable Actions on the
+  fork, add a `SYNC_TOKEN` — where it used to promise updates "arrive as a pull
+  request" and leave the setup to a paragraph at the end of the README.
+- A fork with no `SYNC_TOKEN` was told to change a GitHub Actions permission
+  setting, which does not fix it. The error now names the missing token.
+
 ## 1.3.0 — 2026-09-30
 
 No action required. Merge and deploy; there is no migration, and the new
