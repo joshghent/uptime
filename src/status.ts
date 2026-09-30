@@ -25,9 +25,9 @@ export type Day = { day: string; state: DayState; ok: number; fail: number; degr
  *
  * `incident` rows come from the incidents table — a monitor that met its alarm
  * rule. The other two come from the daily rollups, and exist because a red or
- * amber bar does not need an incident behind it: a single failed check colours
- * the day red, and a slow-but-passing check colours it amber, while neither on
- * its own trips `failures_before_alarm`. Without these the page showed colours
+ * amber bar does not need an incident behind it: failed checks colour the day
+ * red (or amber, above `day_down_below`), and a slow-but-passing check colours
+ * it amber, while neither on its own trips `failures_before_alarm`. Without these the page showed colours
  * it could not explain.
  */
 export type EventKind = "incident" | "outage" | "degraded";
@@ -81,10 +81,15 @@ export type Status = {
   events: StatusEvent[];
 };
 
-function dayState(row: { ok: number; fail: number; degraded: number } | undefined): DayState {
+/**
+ * `downBelow` is `day_down_below`: a day with failures is red only when its pass
+ * rate drops under it, and amber otherwise — so one blip in 1440 checks does not
+ * paint the same colour as an hour offline.
+ */
+function dayState(row: { ok: number; fail: number; degraded: number } | undefined, downBelow: number): DayState {
   if (!row || row.ok + row.fail === 0) return "none";
-  if (row.fail > 0) return "down";
-  if (row.degraded > 0) return "degraded";
+  if (row.fail > 0 && (row.ok / (row.ok + row.fail)) * 100 < downBelow) return "down";
+  if (row.fail > 0 || row.degraded > 0) return "degraded";
   return "up";
 }
 
@@ -119,7 +124,7 @@ function rollupEvent(m: MonitorStatus, d: Day): StatusEvent | null {
   if (d.fail > 0) {
     return {
       ...base,
-      kind: "outage",
+      kind: d.state === "down" ? "outage" : "degraded",
       reason: `${plural(d.fail, "check")} of ${d.ok + d.fail} failed`,
     };
   }
@@ -156,7 +161,7 @@ export async function buildStatus(d1: D1Database, config: Config, now: number): 
       const row = perDay.get(day);
       return {
         day,
-        state: dayState(row),
+        state: dayState(row, config.dayDownBelow),
         ok: row?.ok ?? 0,
         fail: row?.fail ?? 0,
         degraded: row?.degraded ?? 0,

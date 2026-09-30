@@ -149,6 +149,7 @@ fails the lint and the deploy, naming the variable. Set them with
 | `description` | string | — | Sub-line under the header and the meta description |
 | `link` | URL | — | Where the header logo links; usually your product |
 | `retain_days` | int > 0 | `7` | Days of raw check results kept. The 90-day bars read daily rollups, so this only bounds the recent-window alarm rules |
+| `day_down_below` | 0–100 | `100` | A day's bar goes red only when its pass rate is below this percentage; failures above it colour the day amber. `100` makes any failed check a red day |
 | `defaults` | map | `{}` | Inherited by every monitor; see below |
 | `notify` | map | — | Where alerts go; see below |
 | `monitors` | list | — | At least one required |

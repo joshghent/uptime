@@ -305,6 +305,25 @@ describe("event history", () => {
     ]);
   });
 
+  it("colours a failed day amber while its pass rate stays above day_down_below", async () => {
+    const c = loadConfig(`
+day_down_below: 99.5
+monitors:
+  - name: Site
+    url: https://site.test/health
+`);
+    await day("site", yesterday, 1439, 1);
+    await day("site", today, 1400, 40);
+
+    const m = (await buildStatus(env.DB, c, NOW)).monitors[0]!;
+    expect(m.days.find((d) => d.day === yesterday)!.state).toBe("degraded");
+    expect(m.days.find((d) => d.day === today)!.state).toBe("down");
+
+    const list = await events(c);
+    expect(list.find((e) => e.day === yesterday)).toMatchObject({ kind: "degraded", reason: "1 check of 1440 failed" });
+    expect(list.find((e) => e.day === today)).toMatchObject({ kind: "outage" });
+  });
+
   it("explains a slow day, which never alarms at all", async () => {
     await day("site", today, 1440, 0, 12);
 

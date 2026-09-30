@@ -108,6 +108,12 @@ export const configSchema = z.strictObject({
   link: z.string().url().optional(),
   /** Days of raw samples to keep. The 90-day view uses daily rollups. */
   retain_days: z.number().int().positive().default(7),
+  /**
+   * A day's bar turns red only when its pass rate falls below this percentage.
+   * Failures above it colour the day amber. 100 keeps the strict rule: one
+   * failed check in a day is a red day.
+   */
+  day_down_below: z.number().gt(0).max(100).default(100),
   defaults: defaults.default({}),
   notify,
   monitors: z
@@ -156,6 +162,7 @@ export type Config = {
   description?: string;
   link?: string;
   retainDays: number;
+  dayDownBelow: number;
   monitors: Monitor[];
 };
 
@@ -290,6 +297,7 @@ export function loadConfig(source: string, env: Record<string, unknown> = {}): C
     description: c.description,
     link: c.link,
     retainDays: c.retain_days,
+    dayDownBelow: c.day_down_below,
     monitors,
   };
 }
