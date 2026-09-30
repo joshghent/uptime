@@ -67,6 +67,7 @@ description: Live availability for everything we run.
 link: https://acme.com
 
 retain_days: 7          # raw check results kept; the 90-day bars use rollups
+day_down_below: 99.5    # a day is red only below this pass rate; amber above it
 
 defaults:               # inherited by every monitor
   interval: 1m
@@ -102,6 +103,7 @@ monitors:
 | `description` | string | — | Sub-line under the header, and the meta description |
 | `link` | URL | — | Where the header logo links; usually your product |
 | `retain_days` | int > 0 | `7` | Days of raw check results kept. The 90-day bars read daily rollups, so this only bounds the recent-window alarm rules |
+| `day_down_below` | 0–100 | `100` | A day's bar goes red only when its pass rate is below this percentage; failures above it colour the day amber. `100` makes any failed check a red day |
 | `defaults` | map | `{}` | Inherited by every monitor |
 | `notify` | map | — | Where alerts go |
 | `monitors` | list | — | At least one required |

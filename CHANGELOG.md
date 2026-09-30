@@ -7,6 +7,20 @@ you beyond merging — a migration, a config change, a new secret.
 Versions are semver against what an operator sees: a major means your config,
 your database or your deploy needs a hand.
 
+## 1.3.0 — 2026-09-30
+
+No action required. Merge and deploy; there is no migration, and the new
+setting defaults to today's behaviour.
+
+### Added
+
+- **`day_down_below`.** A day's bar goes red only when its pass rate falls below
+  this percentage; failures above it colour the day amber, and the event
+  history lists it as degraded rather than an outage. At one check a minute a
+  single dropped request is 0.07% of the day, and it painted the same red as an
+  hour offline. Defaults to `100`, which keeps the old rule — set it (99.5 is a
+  sensible start) to opt in.
+
 ## 1.2.0 — 2026-08-24
 
 No action required. Merge and deploy; there is no migration and no config

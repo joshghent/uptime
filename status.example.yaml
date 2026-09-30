@@ -19,6 +19,11 @@ link: https://acme.com
 # so this only bounds the recent-window alarm rules.
 retain_days: 7
 
+# A day's bar turns red only when its pass rate falls below this percentage;
+# failures above it colour the day amber. At one check a minute, 99.5 means
+# about seven failed checks. 100 makes any single failure a red day.
+# day_down_below: 99.5
+
 # Applied to every monitor unless the monitor overrides it.
 #
 # 1m + 2 consecutive failures means an outage alerts within ~2 minutes, which
