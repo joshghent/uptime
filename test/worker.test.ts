@@ -1,13 +1,14 @@
 import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadConfig } from "../src/config.ts";
-import worker from "../src/index.ts";
+import { createWorker } from "../src/index.ts";
 import { REPO } from "../src/page.ts";
 import { LATEST_MIGRATION, VERSION } from "../src/version.ts";
 import source from "../status.yaml";
 
 // Asserted against your own status.yaml, so editing it cannot silently break
 // the page without a test noticing — on a fork as much as here.
+const worker = createWorker(source);
 const config = loadConfig(source, env as unknown as Record<string, unknown>);
 const heartbeat = config.monitors.find((m) => m.type === "heartbeat");
 const http = config.monitors.find((m) => m.type === "http")!;
