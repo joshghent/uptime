@@ -51,12 +51,15 @@ commented-out `routes` entry are per-deployment and must stay generic.
 
 ## Migrations
 
-Add a numbered file to `migrations/`, then update `LATEST_MIGRATION` in
-`src/version.ts` — `test/migrations.test.ts` fails if you forget. That constant
-is how a running Worker knows whether its database is up to date.
+Add a numbered file to `migrations/`, then add it to `MIGRATIONS` in
+`src/migrate.ts` — `test/migrations.test.ts` fails if you forget. The Worker
+bundles that list and applies whatever is missing on first use, so an update
+that adds a migration needs nothing from the people running it.
 
-Migrations must be additive. Someone will deploy the new code minutes before
-they apply the migration, and a `DROP` in that window takes their page down.
+Migrations must be additive. Isolates still running the old code keep serving
+for a while after the new one has migrated, and a `DROP` in that window takes
+their page down. Keep each one to plain statements separated by `;`, with no
+`;` or `--` inside a string: the Worker splits them without a SQL parser.
 
 Anything an operator has to do by hand goes in the CHANGELOG under **Action
 required**.

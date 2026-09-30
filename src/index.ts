@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { ConfigError, loadConfig, type Config } from "./config.ts";
 import * as db from "./db.ts";
 import { esc, renderPage } from "./page.ts";
+import { migrate } from "./migrate.ts";
 import { runChecks } from "./run.ts";
 import { buildStatus } from "./status.ts";
 import { LATEST_MIGRATION, VERSION } from "./version.ts";
@@ -29,7 +30,25 @@ export function createWorker(source: string) {
     return (cached ??= loadConfig(source, env as unknown as Record<string, unknown>));
   }
 
+  // Once per isolate, before anything touches the schema. A failure is not
+  // cached, so the next request tries again instead of the isolate staying
+  // broken until it is evicted.
+  let migrated: Promise<void> | undefined;
+  function ready(env: Env): Promise<void> {
+    return (migrated ??= migrate(env.DB).catch((e) => {
+      migrated = undefined;
+      throw e;
+    }));
+  }
+
   const app = new Hono<{ Bindings: Env }>();
+
+  // /health is left out so it can report a failed migration as a 503 with a
+  // body, rather than fail the same way everything else does.
+  app.use(async (c, next) => {
+    if (c.req.path !== "/health") await ready(c.env);
+    await next();
+  });
 
   app.get("/", async (c) => {
     const status = await buildStatus(c.env.DB, getConfig(c.env), now());
@@ -75,10 +94,11 @@ export function createWorker(source: string) {
    * Liveness for the status page itself, and the version it is running.
    *
    * It answers 503 when the newest migration has not been applied, so pointing
-   * one monitor at your own `/health` turns "deployed the update, forgot the
-   * migration" into an ordinary incident with an ordinary alert.
+   * one monitor at your own `/health` turns a migration that failed to apply
+   * into an ordinary incident with an ordinary alert.
    */
   app.get("/health", async (c) => {
+    await ready(c.env).catch((e) => console.error("migrations failed:", e));
     const applied = await db.migrationApplied(c.env.DB, LATEST_MIGRATION);
     return c.json(
       {
@@ -115,6 +135,7 @@ export function createWorker(source: string) {
     fetch: app.fetch,
 
     async scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext) {
+      await ready(env);
       const results = await runChecks(env.DB, getConfig(env), now());
       for (const r of results) {
         if (r.transition) console.log(`${r.monitor}: incident ${r.transition} (${r.sample.error ?? "recovered"})`);
