@@ -9,18 +9,20 @@ first — it is cheaper to disagree about an idea than about a diff.
 ```sh
 git clone https://github.com/joshghent/uptime && cd uptime
 pnpm install
-pnpm run db:migrate:local   # create the local tables
 pnpm dev                    # http://localhost:8787
 ```
 
-The first command that needs one creates `status.yaml` and `.dev.vars` from the
-`*.example` files. `status.yaml` is not tracked here — see below.
+`pnpm dev` runs `dev/worker.ts`: the Worker built from `createWorker` around
+`template/status.yaml`, the same way a deployment builds its own. It creates
+its tables on the first request. The first command that needs one creates
+`.dev.vars` from `template/.dev.vars.example`.
 
 Before pushing:
 
 ```sh
-pnpm lint   # typecheck + config lint
-pnpm test   # vitest, running inside workerd against real D1
+pnpm lint            # typecheck + config lint
+pnpm test            # vitest, running inside workerd against real D1
+pnpm test:template   # pack the packages, start a deployment, run its check
 ```
 
 `pnpm dev` does not run the cron on a schedule. Trigger one by hand:
@@ -30,15 +32,19 @@ npx wrangler dev --test-scheduled
 curl "http://localhost:8787/__scheduled?cron=*+*+*+*+*"
 ```
 
-## What this repository does and does not contain
+## How the repository is laid out
 
-`status.yaml` is deliberately absent. It belongs to whoever runs the page, and
-keeping it out of upstream is what stops a fork's monitors from colliding with
-an update. Changes to the shipped defaults go in `status.example.yaml`; CI fails
-if `status.yaml` is ever committed here.
+- `src/` is the package: `createWorker` and the `uptime` command. `pnpm build`
+  bundles it into `dist/`, which is what npm gets.
+- `migrations/` is bundled into the Worker, which applies it itself.
+- `template/` is a whole deployment, copied by `npm create uptime`. Its
+  `status.yaml` is also the example config this repository develops and tests
+  against, so a change to the shipped defaults goes there.
+- `packages/create-uptime/` is the `npm create uptime` shim.
 
-The same applies to the placeholders in `wrangler.jsonc` — `database_id` and the
-commented-out `routes` entry are per-deployment and must stay generic.
+A deployment's own repository holds only `template/`'s files, and they never
+update after it is created. Anything that has to change with a release belongs
+in the package, not the template.
 
 ## House style
 
@@ -80,14 +86,21 @@ required**.
 
 For maintainers:
 
-1. Bump `version` in `package.json`.
+1. Bump `version` in `package.json`, and in `packages/create-uptime/package.json`
+   both its `version` and its pin on `@joshghent/uptime`.
 2. Add the section to `CHANGELOG.md`, headed `## <version> — <YYYY-MM-DD>`.
 3. `git tag v<version> && git push --tags`.
 
-The release workflow re-runs the checks, refuses a tag that disagrees with
-`package.json`, and publishes the CHANGELOG section as the release notes. Forks
-pick it up through their own sync PR.
+The release workflow re-runs the checks, refuses a tag that disagrees with any
+of those three, publishes both packages to npm, and publishes the CHANGELOG
+section as the release notes. Every deployment's Dependabot then opens a pull
+request for it, and merges it if it is not a major.
 
-Upstream deploys nothing. This repository is the template; the maintainer's own
-status page runs from a fork like everyone else's, which is also what keeps the
-update path honest.
+So semver is a promise about deployments: a minor or patch must work with no
+one looking. Anything that needs a human is a major, with the steps under
+**Action required**. Tag `v<version>-rc.<n>` to publish a release candidate
+under npm's `next` tag, which deployments do not follow.
+
+Upstream deploys nothing. The maintainer's own status page is a deployment of
+the package like everyone else's, which is also what keeps the update path
+honest.
