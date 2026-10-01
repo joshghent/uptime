@@ -17,7 +17,7 @@
     "./cli": "./dist/cli.js"
   },
   "bin": {
-    "uptime": "./dist/cli.js"
+    "uptime": "dist/cli.js"
   },
   "files": [
     "dist",
