@@ -145,6 +145,12 @@ export const configSchema = z.strictObject({
    * failed check in a day is a red day.
    */
   day_down_below: z.number().gt(0).max(100).default(100),
+  /**
+   * A day's bar turns amber only when the share of its checks that passed in
+   * time — not failed, not slower than `degraded_ms` — falls below this
+   * percentage. 100 keeps the strict rule: one slow or failed check is enough.
+   */
+  day_degraded_below: z.number().gt(0).max(100).default(100),
   defaults: defaults.default({}),
   notify,
   monitors: z
@@ -194,6 +200,7 @@ export type Config = {
   link?: string;
   retainDays: number;
   dayDownBelow: number;
+  dayDegradedBelow: number;
   monitors: Monitor[];
 };
 
@@ -329,6 +336,7 @@ export function loadConfig(source: string, env: Record<string, unknown> = {}): C
     link: c.link,
     retainDays: c.retain_days,
     dayDownBelow: c.day_down_below,
+    dayDegradedBelow: c.day_degraded_below,
     monitors,
   };
 }

@@ -153,6 +153,7 @@ fails the lint and the page, naming the variable. Set them with
 | `link` | URL | — | Where the header logo links; usually your product |
 | `retain_days` | int > 0 | `7` | Days of raw check results kept. The 90-day bars read daily rollups, so this only bounds the recent-window alarm rules |
 | `day_down_below` | 0–100 | `100` | A day's bar goes red only when its pass rate is below this percentage; failures above it colour the day amber. `100` makes any failed check a red day |
+| `day_degraded_below` | 0–100 | `100` | A day's bar goes amber only when the share of its checks that passed in time — not failed, not slower than `degraded_ms` — is below this percentage. `100` makes any single slow or failed check an amber day |
 | `defaults` | map | `{}` | Inherited by every monitor; see below |
 | `notify` | map | — | Where alerts go; see below |
 | `monitors` | list | — | At least one required |

@@ -64,6 +64,7 @@ link: https://acme.com
 
 retain_days: 7          # raw check results kept; the 90-day bars use rollups
 day_down_below: 99.5    # a day is red only below this pass rate; amber above it
+day_degraded_below: 99.5  # and amber only when under 99.5% of checks were clean
 
 defaults:               # inherited by every monitor
   interval: 1m
@@ -101,6 +102,7 @@ monitors:
 | `link` | URL | — | Where the header logo links; usually your product |
 | `retain_days` | int > 0 | `7` | Days of raw check results kept. The 90-day bars read daily rollups, so this only bounds the recent-window alarm rules |
 | `day_down_below` | 0–100 | `100` | A day's bar goes red only when its pass rate is below this percentage; failures above it colour the day amber. `100` makes any failed check a red day |
+| `day_degraded_below` | 0–100 | `100` | A day's bar goes amber only when the share of its checks that passed in time — not failed, not slower than `degraded_ms` — is below this percentage. `100` makes any single slow or failed check an amber day |
 | `defaults` | map | `{}` | Inherited by every monitor |
 | `notify` | map | — | Where alerts go |
 | `monitors` | list | — | At least one required |
@@ -249,8 +251,10 @@ rollup. The alarm rules read the recent samples; the 90-day bars read the
 rollups. That keeps the page one indexed query per table no matter how long the
 page has been running, and lets raw samples be pruned after `retain_days`.
 
-A day bar is red if any check failed that day, yellow if any was degraded, green
-if all passed, and grey if nothing ran. Uptime is `passed / (passed + failed)`
+A day bar is grey if nothing ran. Otherwise it is red when the day's pass rate
+is under `day_down_below`, amber when the share of checks that passed in time is
+under `day_degraded_below`, and green if neither. Both default to 100, so out of
+the box one failed check is a red day and one slow one an amber day. Uptime is `passed / (passed + failed)`
 over the days that recorded a check — a monitor you added yesterday reports on
 its one day of data, not on 89 days that predate it.
 
