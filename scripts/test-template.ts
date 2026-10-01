@@ -1,12 +1,13 @@
-// Tests the package the way a deployment uses it: packs it as npm would
-// publish it, starts a deployment from the template with `uptime init`,
-// installs the tarball with npm, and runs that deployment's own check.
+// Tests the packages the way a deployment uses them: packs both as npm would
+// publish them, starts a deployment with create-uptime (what `npm create
+// uptime` runs), installs the package with npm, and runs that deployment's
+// own check.
 //
 //   pnpm test:template
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 const scratch = mkdtempSync(join(tmpdir(), "uptime-template-"));
 
@@ -17,10 +18,17 @@ const sh = (cmd: string, args: string[], cwd: string) => execFileSync(cmd, args,
 
 try {
   sh("pnpm", ["pack", "--pack-destination", scratch], ".");
-  const tarball = join(scratch, readdirSync(scratch).find((f) => f.endsWith(".tgz"))!);
+  sh("npm", ["pack", "--pack-destination", scratch], "packages/create-uptime");
+  const tgz = (prefix: string) => join(scratch, readdirSync(scratch).find((f) => f.startsWith(prefix))!);
+  const [tarball, creator] = [tgz("joshghent-uptime-"), tgz("create-uptime-")];
 
+  // Installing both tarballs together satisfies create-uptime's pin on the
+  // package without the registry, which does not have this version yet.
+  const tools = join(scratch, "tools");
+  mkdirSync(tools);
+  sh("npm", ["install", "--no-audit", "--no-fund", "--prefix", tools, tarball, creator], ".");
   const site = join(scratch, "site");
-  sh("node", [resolve("dist/cli.js"), "init", site], ".");
+  sh(join(tools, "node_modules", ".bin", "create-uptime"), [site], ".");
   sh("npm", ["install", "--no-audit", "--no-fund", tarball], site);
 
   // Workers Builds deploys with `npx wrangler deploy`, so the wrangler this

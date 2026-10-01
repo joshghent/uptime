@@ -13,7 +13,8 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./cli": "./dist/cli.js"
   },
   "bin": {
     "uptime": "./dist/cli.js"
