@@ -9,6 +9,6 @@
     "check": "uptime check"
   },
   "dependencies": {
-    "@joshghent/uptime": "^1.3.0"
+    "@joshghent/uptime": "^2.0.0"
   }
 }
