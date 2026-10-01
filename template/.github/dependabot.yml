@@ -1,0 +1,12 @@
+# Watches one package: @joshghent/uptime. A release opens a pull request here,
+# .github/workflows/check.yml proves it against your status.yaml and merges
+# it, and Cloudflare deploys main. Nothing else in this repository changes on
+# its own.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: daily
+    allow:
+      - dependency-name: "@joshghent/uptime"

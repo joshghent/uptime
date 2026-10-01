@@ -101,7 +101,38 @@ const defaults = z.strictObject({
   degraded_ms: z.number().int().positive().optional(),
 });
 
+/**
+ * The shape of status.yaml this release reads. A breaking change to the file
+ * bumps this and adds an upgrader to {@link UPGRADES}, so a file written for
+ * an older release keeps working when a deployment picks up the new one —
+ * nobody has to edit their config for an update to go through.
+ */
+export const CONFIG_VERSION = 1;
+
+/**
+ * `UPGRADES[n]` turns a parsed version `n + 1` document into version `n + 2`.
+ * Each runs on the raw YAML, before `${VAR}` interpolation and validation.
+ * Empty until the first breaking change.
+ */
+const UPGRADES: ((doc: Record<string, unknown>) => Record<string, unknown>)[] = [];
+
+function upgrade(doc: unknown): unknown {
+  if (!doc || typeof doc !== "object" || Array.isArray(doc)) return doc;
+  let out = doc as Record<string, unknown>;
+  const from = out.version ?? 1;
+  if (typeof from !== "number" || !Number.isInteger(from) || from < 1) return doc; // the schema says why
+  if (from > CONFIG_VERSION) {
+    throw new ConfigError([
+      `version: ${from} is newer than this release understands (${CONFIG_VERSION}) — update @joshghent/uptime`,
+    ]);
+  }
+  for (let v = from; v < CONFIG_VERSION; v++) out = { ...UPGRADES[v - 1]!(out), version: v + 1 };
+  return out;
+}
+
 export const configSchema = z.strictObject({
+  /** Which shape of this file it is. Missing means 1. */
+  version: z.number().int().min(1).max(CONFIG_VERSION).default(CONFIG_VERSION),
   title: z.string().default("Status"),
   description: z.string().optional(),
   /** Link on the header back to your product. */
@@ -213,7 +244,7 @@ export class ConfigError extends Error {
 
 /**
  * Parse and validate the YAML config. Throws {@link ConfigError} with one
- * human-readable line per problem — this is what `pnpm lint:config` prints.
+ * human-readable line per problem — this is what `uptime lint` prints.
  */
 export function loadConfig(source: string, env: Record<string, unknown> = {}): Config {
   let doc: unknown;
@@ -225,7 +256,7 @@ export function loadConfig(source: string, env: Record<string, unknown> = {}): C
   if (doc === null || doc === undefined) throw new ConfigError(["the config file is empty"]);
 
   const missing = new Set<string>();
-  const interpolated = interpolate(doc, env, missing);
+  const interpolated = interpolate(upgrade(doc), env, missing);
 
   // Before the schema runs: an unset variable collapses to "", and "Invalid
   // URL" is a much worse error than naming the secret you forgot to set.

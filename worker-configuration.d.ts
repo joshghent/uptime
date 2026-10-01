@@ -6,7 +6,7 @@ interface __BaseEnv_Env {
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
-		mainModule: typeof import("./src/index");
+		mainModule: typeof import("./dev/worker");
 	}
 	interface Env extends __BaseEnv_Env {}
 }
@@ -20,6 +20,10 @@ declare module "*.css" {
 	export default value;
 }
 declare module "*.txt" {
+	const value: string;
+	export default value;
+}
+declare module "*.sql" {
 	const value: string;
 	export default value;
 }

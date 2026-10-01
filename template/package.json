@@ -1,0 +1,14 @@
+{
+  "name": "status-page",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "lint": "uptime lint",
+    "check": "uptime check"
+  },
+  "dependencies": {
+    "@joshghent/uptime": "^2.0.0"
+  }
+}

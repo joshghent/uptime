@@ -15,10 +15,11 @@ GET  /api/status  The same data as JSON. Cached 30s. `access-control-allow-origi
 GET  /ping/:id    Heartbeat receiver. POST works too. Returns 200 `ok`, 401 on a
                   bad token, 404 on an unknown or non-heartbeat id.
 GET  /health      Liveness for the status page itself, plus the version it runs.
-                  200 `{"status":"ok","version":"1.1.0",
+                  200 `{"status":"ok","version":"2.0.0",
                   "latestMigration":"0002_prune_index.sql","migrationsApplied":true}`.
-                  503 with `"status":"degraded"` when the database has not had
-                  the newest migration applied.
+                  503 with `"status":"degraded"` when the database could not be
+                  brought up to date. The Worker applies its own migrations on
+                  first use, so this means one failed rather than was skipped.
 GET  /llms.txt    This file.
 
 Read `/api/status` rather than scraping the HTML. It is the same data the page
@@ -31,7 +32,7 @@ renders, from the same query.
   "title": "Acme Status",
   "description": "Live availability for everything we run.",
   "link": "https://acme.com",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "generatedAt": 1786172940,
   "windowDays": 90,
   "overall": "up",
@@ -132,19 +133,21 @@ clock: after that, silence is a failure.
 ## Configuration
 
 One file, `status.yaml`, bundled into the Worker at build time. Editing it means
-a deploy. `pnpm lint:config` validates it and names every problem. It starts as
-a copy of `status.example.yaml` and belongs to whoever runs the page — upstream
-does not track it, so an update cannot conflict with it.
+a deploy. `npm run lint` (`uptime lint`) validates it and names every problem.
+It lives in the page owner's repository; updates to the package never touch
+it. `version:` says which shape of the file it is (missing means 1), and a
+release that changes the shape upgrades older files in memory.
 
 Any `${VAR}` in any string is replaced from the Worker's environment before
 validation, so secrets stay out of git. A referenced variable that is not set
-fails the lint and the deploy, naming the variable. Set them with
+fails the lint and the page, naming the variable. Set them with
 `npx wrangler secret put NAME`, or in `.dev.vars` for local runs.
 
 ### Top level
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
+| `version` | int | `1` | Which shape of this file it is. Older versions are upgraded in memory, so an update never requires editing it |
 | `title` | string | `Status` | Page title and header |
 | `description` | string | — | Sub-line under the header and the meta description |
 | `link` | URL | — | Where the header logo links; usually your product |
@@ -294,21 +297,20 @@ monitors:
 ## Running your own
 
 ```sh
-# fork it first, then
-git clone https://github.com/<you>/uptime && cd uptime
-pnpm install
-pnpm setup                         # status.yaml from status.example.yaml
+npm create uptime my-status && cd my-status
+npm install
 npx wrangler d1 create uptime      # copy database_id into wrangler.jsonc
-pnpm run db:migrate
-# edit status.yaml, then commit it — your fork owns it
-pnpm lint:config
-pnpm run deploy
+# edit status.yaml, then
+npm run lint
+# push to GitHub, then import the repository in Cloudflare Workers Builds
 ```
 
-Updates come from upstream: `git remote add upstream
-https://github.com/joshghent/uptime.git`, then `git merge upstream/main`. A
-shipped workflow can open that as a weekly pull request instead. `status.yaml`
-is not tracked upstream, so an update never collides with your monitors.
+The result is a repository of four files around the `@joshghent/uptime` npm
+package: `status.yaml`, `worker.js` (`export default createWorker(config)`),
+`wrangler.jsonc`, and a workflow. The Worker creates and migrates its own
+tables. Updates arrive as Dependabot pull requests that `npm run check`
+(`uptime check`: lint, build, boot) proves and then merges for minor and patch
+releases; majors wait for a human and their release notes say what to do.
 
 Cloudflare's free tier covers a handful of monitors. Full setup, custom domains,
 cost notes and development instructions are in the README:

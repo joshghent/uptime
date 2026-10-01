@@ -16,30 +16,32 @@ through, no per-monitor pricing, no vendor holding your incident history.
 - 90 days of uptime bars, a filterable event history, and a JSON API
 - `/llms.txt` and a CORS-open JSON API, so an agent reads it in one fetch
 - One config file, linted before you deploy
+- Updates arrive by themselves: a release opens a Dependabot pull request,
+  your CI proves it against your config and merges it, and Cloudflare deploys
 
 ## Quick start
 
-Fork this repository first, then clone your fork — updates arrive as a pull
-request against it, and your config lives there.
-
 ```sh
-git clone https://github.com/<you>/uptime && cd uptime
-pnpm install
-pnpm setup                             # creates status.yaml and .dev.vars
-
-npx wrangler d1 create uptime          # copy the database_id into wrangler.jsonc
-pnpm run db:migrate                    # create the tables
-
+npm create uptime my-status && cd my-status
+npm install
+npx wrangler d1 create uptime     # copy the database_id into wrangler.jsonc
 # edit status.yaml, then
-pnpm lint:config
-pnpm run deploy
-
-git add status.yaml && git commit -m "My monitors"   # your fork owns this file
+npm run lint
 ```
+
+That directory is your whole status page: `status.yaml`, a three-line
+`worker.js`, `wrangler.jsonc`, and a workflow that keeps it up to date.
+Everything else comes from the [`@joshghent/uptime`](https://www.npmjs.com/package/@joshghent/uptime)
+package.
+
+Push it to a GitHub repository, then connect that repository in the Cloudflare
+dashboard under **Workers & Pages → Create → Import a repository**. Leave the
+build settings at their defaults. Every push to `main` deploys, and the Worker
+creates its own tables on the first request — there is no migration step.
 
 Your page is live at `https://uptime.<your-subdomain>.workers.dev`.
 
-To put it on your own domain, add a route to `wrangler.jsonc` and deploy again —
+To put it on your own domain, add a route to `wrangler.jsonc` and push —
 wrangler creates the DNS record for you, as long as the zone is already in the
 same Cloudflare account:
 
@@ -50,16 +52,10 @@ same Cloudflare account:
 Pick a domain none of the monitored apps serve. A status page that shares
 infrastructure with the thing it watches goes down at exactly the wrong moment.
 
-> `pnpm deploy` is a built-in pnpm command. Use `pnpm run deploy`.
-
 ## Configuration
 
-Everything lives in `status.yaml`. Change it, deploy, done.
-
-That file is yours: this repository ships
-[`status.example.yaml`](status.example.yaml) as the template and does not track
-the copy you edit, so pulling an update can never collide with your monitors.
-Commit it to your fork — the deploy bundles it.
+Everything lives in `status.yaml`. Change it, push, done. The deploy bundles
+it into the Worker, and updates to the package never touch it.
 
 ```yaml
 title: Acme Status
@@ -99,6 +95,7 @@ monitors:
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
+| `version` | int | `1` | Which shape of this file it is. A release that changes the shape upgrades older files in memory, so an update never needs you to edit it |
 | `title` | string | `Status` | Page title and header |
 | `description` | string | — | Sub-line under the header, and the meta description |
 | `link` | URL | — | Where the header logo links; usually your product |
@@ -163,8 +160,9 @@ npx wrangler secret put NTFY_URL
 ```
 
 For local development put the same names in `.dev.vars` (copy
-`.dev.vars.example`). A missing variable fails the lint and the deploy with the
-variable named, rather than a mystery URL error.
+`.dev.vars.example`). A missing variable fails the lint with the variable
+named, rather than a mystery URL error, and the page says the same if one is
+missing in production.
 
 ## Heartbeat monitors
 
@@ -220,7 +218,7 @@ A notification that fails is logged; it never blocks a check from recording.
 | `GET /` | The status page. `?monitor=<id>` filters the event history to one service |
 | `GET /api/status` | The same data as JSON, CORS-open |
 | `GET \| POST /ping/:id` | Heartbeat receiver |
-| `GET /health` | Liveness, the version you are running, and whether the database is migrated |
+| `GET /health` | Liveness, the version you are running, and whether the database is up to date |
 | `GET /llms.txt` | The whole reference — endpoints, JSON shape, every config key — as plain text |
 
 ### For agents
@@ -265,85 +263,60 @@ of which alarms. So the history lists incidents *and* the bad days no incident
 covers, which is what makes every colour on the page traceable to a row. It
 shows five, expands to the rest in place, and filters to one service.
 
-## Development
+## Running it locally
+
+In your status page's directory:
 
 ```sh
-pnpm run db:migrate:local   # create the local tables
-pnpm dev                    # http://localhost:8787
-pnpm test                   # vitest, running inside workerd against real D1
-pnpm lint                   # typecheck + config lint
+npm run dev       # http://localhost:8787, secrets from .dev.vars
+npm run check     # what CI runs on every update: lint, build, boot
 ```
 
-`pnpm dev` will not run the cron on a schedule. Trigger one by hand:
+`npm run dev` will not run the cron on a schedule. Trigger one by hand:
 
 ```sh
 npx wrangler dev --test-scheduled
 curl "http://localhost:8787/__scheduled?cron=*+*+*+*+*"
 ```
 
-## Deploying
-
-`pnpm run deploy` applies migrations and then deploys, in that order, so the
-schema is never behind the code that reads it.
-
-Cloudflare Workers Builds deploys on every push to `main` once the repo is
-connected. Set its deploy command to `pnpm run deploy` rather than the default
-`npx wrangler deploy`, so migrations travel with the code.
-
-To deploy from GitHub Actions instead, set the repo variable
-`DEPLOY_VIA_ACTIONS` to `true`, add a `CLOUDFLARE_API_TOKEN` secret, and turn
-Workers Builds off so the two don't race. That job migrates before deploying
-too.
-
-If a migration is ever missed, `/health` answers `503` and says which one is
-outstanding. Point a monitor at your own `/health` — the shipped example config
-has one — and the page tells you through the same alerts as everything else.
-
 ## Updating
 
-Releases are tagged and published on the
-[releases page](https://github.com/joshghent/uptime/releases), with notes taken
-from [CHANGELOG.md](CHANGELOG.md). Anything you have to do by hand is under
-**Action required**, so read that before merging.
+Updates come to you. `.github/dependabot.yml` watches `@joshghent/uptime` and
+opens a pull request when a release comes out. `.github/workflows/check.yml`
+runs `npm run check` on it — your `status.yaml` validated, the Worker built,
+then booted against an empty database and loaded — and merges it when that
+passes. Cloudflare deploys `main`, and the new Worker brings the database up to
+date itself on its first request.
 
-Point your fork at upstream once:
+None of that needs a token, a secret or a setting, and nothing runs on a
+schedule of its own, so it does not stop when the repository goes quiet.
 
-```sh
-git remote add upstream https://github.com/joshghent/uptime.git
-```
+Minor and patch releases merge themselves. A major waits for you: its notes in
+[CHANGELOG.md](CHANGELOG.md) and on the
+[releases page](https://github.com/joshghent/uptime/releases) have a section
+marked **Action required** that says what to do. A change to the shape of
+`status.yaml` is not one of those — older files keep working.
 
-Then, whenever you want the update:
-
-```sh
-git fetch upstream
-git merge upstream/main
-pnpm lint && pnpm test
-git push            # your deploy runs
-```
-
-Your `status.yaml` and the `database_id` in `wrangler.jsonc` are the only files
-you have changed, and upstream does not touch either, so the merge is normally
-a fast-forward with nothing to resolve.
-
-Prefer it to come to you? [`upstream-sync.yml`](.github/workflows/upstream-sync.yml)
-is already in your fork. Enable Actions on your fork and give it a token: a
-[fine-grained PAT](https://github.com/settings/personal-access-tokens) scoped to
-that fork with **Contents**, **Pull requests** and **Workflows** set to read and
-write, stored as a `SYNC_TOKEN` secret (`gh secret set SYNC_TOKEN`). The token
-is required rather than a convenience — GitHub refuses to let the built-in
-Actions token push a change to any file under `.github/workflows/`, and updates
-here do change workflows. Then it opens a "Sync from upstream" PR every Monday. Your CI runs against your own
-config on that PR, so you see it green before you merge — and merging is what
-deploys. Run it on demand from the Actions tab any time.
+If a check fails, the pull request stays open with the reason, and the page
+keeps running the version it has.
 
 Check what a running page is on:
 
 ```sh
 curl -s https://status.example.com/health
-{"status":"ok","version":"1.1.0","latestMigration":"0002_prune_index.sql","migrationsApplied":true}
+{"status":"ok","version":"2.0.0","latestMigration":"0002_prune_index.sql","migrationsApplied":true}
 ```
 
-The version is in the page footer and in `/api/status` as well.
+`/health` answers `503` if the database could not be brought up to date. Point
+a monitor at your own `/health` — the example config has one — and the page
+tells you through the same alerts as everything else. The version is in the
+page footer and in `/api/status` as well.
+
+### Coming from a fork
+
+Before 2.0 a status page was a fork of this repository, updated by merging.
+The 2.0.0 entry in [CHANGELOG.md](CHANGELOG.md) has the steps to move one onto
+the package; it keeps the same Worker, database and history.
 
 ## How fast you hear about it
 
@@ -370,17 +343,14 @@ sequential scan is the one mistake that turns a free status page into a bill.
 ## Branding
 
 The page uses the Turbo Technologies design tokens, vendored in
-`src/tokens.css`. To rebrand a fork, replace that file with your own tokens —
-`src/app.css` only ever references the semantic `--tt-color-*` names, so nothing
-else needs touching.
-
-The "Run your own" section links back here via one `REPO` constant at the top of
-`src/page.ts`. Point it at your fork, or delete the section.
+`src/tokens.css`, and a "Run your own" section linking back here. Neither is
+configurable from `status.yaml` yet; open an issue if you need it to be.
 
 ## Contributing
 
 Issues and pull requests are welcome — [CONTRIBUTING.md](CONTRIBUTING.md) has
-the dev loop, the house style, and how migrations and releases work. Security
+the dev loop for working on the package, the house style, and how migrations,
+config changes and releases work. Security
 issues go through [SECURITY.md](SECURITY.md), privately, not the issue tracker.
 
 ## Licence

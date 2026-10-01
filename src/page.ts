@@ -6,7 +6,7 @@ import appCss from "./app.css";
 const ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 export const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ESCAPES[c]!);
 
-/** Where "run your own" points. One place, so a fork edits one line. */
+/** Where "run your own" points. */
 export const REPO = "https://github.com/joshghent/uptime";
 
 /** How many events the page shows before the rest go behind "show older". */

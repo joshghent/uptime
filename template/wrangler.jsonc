@@ -1,0 +1,43 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "uptime",
+  "main": "worker.js",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Your own domain goes here. A status page belongs on a domain the apps it
+  // watches don't serve, so an outage there cannot take the page with it.
+  // `custom_domain` makes wrangler create the DNS record on deploy; the zone
+  // has to already be in the account. Leave it commented to stay on workers.dev.
+  //
+  // "routes": [{ "pattern": "status.example.com", "custom_domain": true }],
+
+  // Kept on so the workers.dev URL stays a working fallback if DNS or the
+  // certificate ever has a bad day.
+  "workers_dev": true,
+
+  // status.yaml is bundled into the Worker as text at build time. The config
+  // lives in git, not in a database — editing it means a deploy.
+  "rules": [{ "type": "Text", "globs": ["**/*.yaml"], "fallthrough": true }],
+
+  // The Worker creates and updates its own tables on first use, so there is
+  // nothing to migrate by hand — now or after an update.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "uptime",
+      // From `npx wrangler d1 create uptime`.
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+    }
+  ],
+
+  // The cron fires every minute; each monitor is skipped unless its own
+  // `interval` has elapsed.
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}

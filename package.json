@@ -1,34 +1,52 @@
 {
-  "name": "uptime",
-  "version": "1.3.0",
+  "name": "@joshghent/uptime",
+  "version": "2.0.0",
   "description": "Open source status page that runs on Cloudflare Workers + D1",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joshghent/uptime.git"
+  },
+  "homepage": "https://github.com/joshghent/uptime#readme",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./cli": "./dist/cli.js"
+  },
+  "bin": {
+    "uptime": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "template"
+  ],
   "packageManager": "pnpm@11.10.0",
   "scripts": {
-    "setup": "node scripts/ensure-config.ts",
+    "build": "node scripts/build.ts",
     "dev": "node scripts/ensure-config.ts && wrangler dev",
-    "deploy": "node scripts/ensure-config.ts && npm run db:migrate && wrangler deploy",
     "typecheck": "tsc --noEmit",
     "lint": "npm run typecheck && npm run lint:config",
-    "lint:config": "node scripts/ensure-config.ts && node scripts/lint-config.ts",
+    "lint:config": "node scripts/ensure-config.ts && node src/cli.ts lint template/status.yaml",
     "test": "node scripts/ensure-config.ts && vitest run",
+    "test:template": "node scripts/test-template.ts",
     "test:watch": "vitest",
-    "db:create": "wrangler d1 create uptime",
-    "db:migrate": "wrangler d1 migrations apply uptime --remote",
-    "db:migrate:local": "wrangler d1 migrations apply uptime --local",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "prepack": "node scripts/build.ts"
   },
   "dependencies": {
-    "hono": "^4.13.0",
-    "yaml": "^2.9.0",
-    "zod": "^4.4.3"
+    "wrangler": "4.119.0"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.20.2",
     "@types/node": "^26.1.2",
+    "esbuild": "^0.28.1",
+    "hono": "^4.13.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10",
-    "wrangler": "^4.119.0"
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
   }
 }

@@ -1,0 +1,21 @@
+{
+  "name": "create-uptime",
+  "version": "2.0.0",
+  "description": "npm create uptime \u2014 start a status page on Cloudflare Workers + D1",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joshghent/uptime.git",
+    "directory": "packages/create-uptime"
+  },
+  "type": "module",
+  "bin": {
+    "create-uptime": "index.js"
+  },
+  "files": [
+    "index.js"
+  ],
+  "dependencies": {
+    "@joshghent/uptime": "2.0.0"
+  }
+}

@@ -1,46 +1,27 @@
+// For working on the package: `pnpm dev` and the tests run dev/worker.ts
+// against a local database. Nothing deploys from this repository — a real
+// status page is a copy of template/, whose wrangler.jsonc has the advice on
+// domains and databases.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "uptime",
-  "main": "src/index.ts",
+  "main": "dev/worker.ts",
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
 
-  // Your own domain goes here. A status page belongs on a domain the apps it
-  // watches don't serve, so an outage there cannot take the page with it.
-  // `custom_domain` makes wrangler create the DNS record on deploy; the zone
-  // has to already be in the account. Leave it commented to stay on workers.dev.
-  //
-  // "routes": [{ "pattern": "status.example.com", "custom_domain": true }],
-
-  // Kept on so the workers.dev URL stays a working fallback if DNS or the
-  // certificate ever has a bad day.
-  "workers_dev": true,
-
-  // status.yaml is bundled into the Worker as a string at build time. The
-  // config lives in git, not in a database — editing it means a deploy, which
-  // is the whole point. The CSS is inlined into the page for the same reason:
-  // one request, no asset pipeline.
-  "rules": [{ "type": "Text", "globs": ["**/*.yaml", "**/*.css", "**/*.txt"], "fallthrough": true }],
+  // status.yaml, the CSS, llms.txt and the migrations are imported as text.
+  // The published package inlines them at build time instead.
+  "rules": [{ "type": "Text", "globs": ["**/*.yaml", "**/*.css", "**/*.txt", "**/*.sql"], "fallthrough": true }],
 
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "uptime",
-      // From `pnpm run db:create`. This one line is yours, not upstream's —
-      // it is the only thing in this file you have to change.
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
-      "migrations_dir": "migrations"
+      "database_id": "00000000-0000-0000-0000-000000000000"
     }
   ],
 
-  // The cron fires every minute; each monitor is skipped unless its own
-  // `interval` has elapsed. Lower the frequency here if you want fewer D1
-  // writes than your monitors' intervals imply.
   "triggers": {
     "crons": ["* * * * *"]
-  },
-
-  "observability": {
-    "enabled": true
   }
 }

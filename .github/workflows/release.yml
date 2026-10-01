@@ -1,12 +1,21 @@
-# Publishes a GitHub Release when a version tag is pushed.
+# Publishes a release when a version tag is pushed: @joshghent/uptime and
+# create-uptime to npm, then a GitHub Release.
 #
-#   1. bump "version" in package.json
+#   1. bump "version" in package.json, and in packages/create-uptime/package.json
+#      along with its pin on @joshghent/uptime
 #   2. add the section to CHANGELOG.md
 #   3. git tag v1.2.0 && git push --tags
 #
 # The tag has to agree with package.json, because that is what the running
 # Worker reports on /health and in the footer. A tag that disagreed would make
 # every deployment lie about which release it is.
+#
+# A tag like v2.0.0-rc.1 is a prerelease: it goes to npm under `next`, which
+# no deployment's Dependabot follows, and needs no CHANGELOG section.
+#
+# npm publishing uses trusted publishing (OIDC), so there is no npm token to
+# keep. Each package lists this repository and this workflow file as its
+# trusted publisher on npmjs.com.
 name: Release
 
 on:
@@ -15,6 +24,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   release:
@@ -26,33 +36,45 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+          registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
 
-      - name: Tag matches package.json
+      - name: Tag matches both packages
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME#v}"
-          pkg="$(jq -r .version package.json)"
-          if [ "$tag" != "$pkg" ]; then
-            echo "::error::tag v$tag does not match package.json version $pkg"
-            exit 1
-          fi
+          for check in \
+            "package.json .version" \
+            "packages/create-uptime/package.json .version" \
+            "packages/create-uptime/package.json .dependencies[\"@joshghent/uptime\"]"; do
+            set -- $check
+            got="$(jq -r "$2" "$1")"
+            if [ "$tag" != "$got" ]; then
+              echo "::error::tag v$tag does not match $2 in $1 ($got)"
+              exit 1
+            fi
+          done
 
       # The same checks CI runs. A release that was never green is worse than a
-      # late one, and every fork is about to be offered this commit.
+      # late one, and every deployment is about to be offered it.
       - run: pnpm typecheck
       - run: pnpm lint:config
         env:
           NTFY_URL: https://ntfy.example/ci
           HEARTBEAT_TOKEN: ci
       - run: pnpm test
+      - run: pnpm build
+      - run: pnpm test:template
 
-      - name: Publish the release
-        env:
-          GH_TOKEN: ${{ github.token }}
+      # Before anything is published, because a publish cannot be taken back.
+      - name: Release notes
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
+          if [[ "$version" == *-* ]]; then
+            echo "Release candidate for ${version%%-*}. Not offered to deployments." > notes.md
+            exit 0
+          fi
           notes="$(awk -v v="$version" '
             $1 == "##" && $2 == v { found = 1; next }
             found && $1 == "##" { exit }
@@ -63,6 +85,25 @@ jobs:
             echo "::error::CHANGELOG.md has no section for $version"
             exit 1
           fi
-
           printf '%s\n' "$notes" > notes.md
-          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md
+
+      # Trusted publishing needs npm 11.5.1 or later; Node 22 ships npm 10.
+      - run: npm install -g npm@^11.5.1
+
+      # The package first: create-uptime pins it, so it has to exist.
+      - name: Publish to npm
+        run: |
+          set -euo pipefail
+          tag=latest
+          [[ "$GITHUB_REF_NAME" == *-* ]] && tag=next
+          npm publish --access public --tag "$tag"
+          (cd packages/create-uptime && npm publish --access public --tag "$tag")
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          prerelease=()
+          [[ "$GITHUB_REF_NAME" == *-* ]] && prerelease=(--prerelease)
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md "${prerelease[@]}"
