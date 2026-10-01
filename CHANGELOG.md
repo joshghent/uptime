@@ -9,6 +9,26 @@ merge into your status page by themselves once its check passes, so they never
 need a hand; migrations and changes to the shape of `status.yaml` are handled
 for you. A major waits for you, and says what to do.
 
+## 2.1.0 — 2026-10-01
+
+No action required. This merges into your status page by itself.
+
+### Added
+
+- `day_degraded_below` does for amber what `day_down_below` does for red: a
+  day's bar is amber only when the share of its checks that passed in time —
+  not failed, not slower than `degraded_ms` — falls below it. The default,
+  `100`, keeps today's colours. Set `day_degraded_below: 99.5` and a day with
+  one slow response or one stray failure out of 1,440 stays green, while a
+  day with a real slowdown still turns amber. The event history follows the
+  colours, so a day left green lists nothing.
+- The README shows the page.
+
+### Fixed
+
+- A release that stops partway through publishing can be finished by
+  re-running it.
+
 ## 2.0.0 — 2026-10-01
 
 uptime is now an npm package, `@joshghent/uptime`, instead of a repository you
