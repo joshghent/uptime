@@ -28,7 +28,7 @@ No action required. This merges into your status page by itself.
 
 - A new status page no longer reports five high-severity vulnerabilities on
   `npm install`. They came from the local-development tooling in wrangler
-  4.119.0 and never reached the deployed Worker; wrangler is now 4.146.0.
+  4.119.0 and never reached the deployed Worker; wrangler is now 4.145.0.
   Releases now fail if a fresh install has any high-severity advisory.
 - A release that stops partway through publishing can be finished by
   re-running it.
