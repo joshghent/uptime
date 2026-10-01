@@ -141,5 +141,5 @@ export function createWorker(source: string) {
         if (r.transition) console.log(`${r.monitor}: incident ${r.transition} (${r.sample.error ?? "recovered"})`);
       }
     },
-  };
+  } satisfies ExportedHandler<Env>;
 }

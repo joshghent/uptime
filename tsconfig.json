@@ -18,5 +18,5 @@
     // number to bump per release rather than two that can disagree.
     "resolveJsonModule": true
   },
-  "include": ["src", "dev", "test", "scripts", "worker-configuration.d.ts", "vitest.config.ts", "package.json"]
+  "include": ["src", "dev", "test", "types", "scripts", "worker-configuration.d.ts", "vitest.config.ts", "package.json"]
 }
