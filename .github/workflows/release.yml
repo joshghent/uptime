@@ -90,14 +90,22 @@ jobs:
       # Trusted publishing needs npm 11.5.1 or later; Node 22 ships npm 10.
       - run: npm install -g npm@^11.5.1
 
-      # The package first: create-uptime pins it, so it has to exist.
+      # The package first: create-uptime pins it, so it has to exist. A version
+      # already on npm is skipped rather than failed, so a run that stopped
+      # halfway can be re-run to finish.
       - name: Publish to npm
         run: |
           set -euo pipefail
           tag=latest
           [[ "$GITHUB_REF_NAME" == *-* ]] && tag=next
-          npm publish --access public --tag "$tag"
-          (cd packages/create-uptime && npm publish --access public --tag "$tag")
+          for dir in . packages/create-uptime; do
+            id="$(jq -r '.name + "@" + .version' "$dir/package.json")"
+            if npm view "$id" version >/dev/null 2>&1; then
+              echo "$id is already on npm"
+              continue
+            fi
+            (cd "$dir" && npm publish --access public --tag "$tag")
+          done
 
       - name: Publish the GitHub Release
         env:

@@ -24,6 +24,11 @@ retain_days: 7
 # about seven failed checks. 100 makes any single failure a red day.
 # day_down_below: 99.5
 
+# The same for amber: a day turns amber only when fewer than this percentage
+# of its checks passed in time — not failed, not slower than `degraded_ms`.
+# 100 makes one slow response an amber day; 99.5 lets a stray blip go.
+# day_degraded_below: 99.5
+
 # Applied to every monitor unless the monitor overrides it.
 #
 # 1m + 2 consecutive failures means an outage alerts within ~2 minutes, which

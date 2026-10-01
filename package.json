@@ -1,6 +1,6 @@
 {
   "name": "@joshghent/uptime",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Open source status page that runs on Cloudflare Workers + D1",
   "license": "MIT",
   "repository": {
@@ -37,10 +37,10 @@
     "prepack": "node scripts/build.ts"
   },
   "dependencies": {
-    "wrangler": "4.119.0"
+    "wrangler": "4.145.0"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.20.2",
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
     "@types/node": "^26.1.2",
     "esbuild": "^0.28.1",
     "hono": "^4.13.0",

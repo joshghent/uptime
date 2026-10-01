@@ -324,6 +324,29 @@ monitors:
     expect(list.find((e) => e.day === today)).toMatchObject({ kind: "outage" });
   });
 
+  it("keeps a day green while its checks that passed in time stay above day_degraded_below", async () => {
+    const c = loadConfig(`
+day_down_below: 99.5
+day_degraded_below: 99.5
+monitors:
+  - name: Site
+    url: https://site.test/health
+`);
+    const before = dayKey(NOW - 2 * 86400);
+    await day("site", before, 1439, 1);
+    await day("site", yesterday, 1440, 0, 2);
+    await day("site", today, 1440, 0, 17);
+
+    const m = (await buildStatus(env.DB, c, NOW)).monitors[0]!;
+    expect(m.days.find((d) => d.day === before)!.state).toBe("up");
+    expect(m.days.find((d) => d.day === yesterday)!.state).toBe("up");
+    expect(m.days.find((d) => d.day === today)!.state).toBe("degraded");
+
+    const list = await events(c);
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ kind: "degraded", day: today });
+  });
+
   it("explains a slow day, which never alarms at all", async () => {
     await day("site", today, 1440, 0, 12);
 

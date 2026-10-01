@@ -35,6 +35,11 @@ try {
   // package depends on has to be the one npx finds.
   sh("npx", ["--no-install", "wrangler", "--version"], site);
   sh("npm", ["run", "check"], site);
+
+  // What a new user sees after `npm install`. Overrides in this repository
+  // never reach them, so a vulnerable dependency has to be fixed by bumping
+  // the package that brings it, before release.
+  sh("npm", ["audit", "--audit-level=high"], site);
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }

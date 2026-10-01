@@ -83,13 +83,21 @@ export type Status = {
 
 /**
  * `downBelow` is `day_down_below`: a day with failures is red only when its pass
- * rate drops under it, and amber otherwise — so one blip in 1440 checks does not
- * paint the same colour as an hour offline.
+ * rate drops under it — so one blip in 1440 checks does not paint the same
+ * colour as an hour offline. `degradedBelow` is `day_degraded_below`, the same
+ * idea one step down: a day is amber only when the share of checks that passed
+ * in time drops under it, so one slow response does not mark the whole day.
  */
-function dayState(row: { ok: number; fail: number; degraded: number } | undefined, downBelow: number): DayState {
+function dayState(
+  row: { ok: number; fail: number; degraded: number } | undefined,
+  downBelow: number,
+  degradedBelow: number,
+): DayState {
   if (!row || row.ok + row.fail === 0) return "none";
-  if (row.fail > 0 && (row.ok / (row.ok + row.fail)) * 100 < downBelow) return "down";
-  if (row.fail > 0 || row.degraded > 0) return "degraded";
+  const total = row.ok + row.fail;
+  if (row.fail > 0 && (row.ok / total) * 100 < downBelow) return "down";
+  const clean = row.ok - row.degraded;
+  if (clean < total && (clean / total) * 100 < degradedBelow) return "degraded";
   return "up";
 }
 
@@ -120,6 +128,9 @@ function incidentDays(i: Incident, now: number, windowStart: number): string[] {
 }
 
 function rollupEvent(m: MonitorStatus, d: Day): StatusEvent | null {
+  // The history explains colours. A day the thresholds left green has nothing
+  // to explain, even if it had a blip.
+  if (d.state === "up") return null;
   const base = { monitor: m.id, name: m.name, at: dayStart(d.day), until: null, day: d.day };
   if (d.fail > 0) {
     return {
@@ -161,7 +172,7 @@ export async function buildStatus(d1: D1Database, config: Config, now: number): 
       const row = perDay.get(day);
       return {
         day,
-        state: dayState(row, config.dayDownBelow),
+        state: dayState(row, config.dayDownBelow, config.dayDegradedBelow),
         ok: row?.ok ?? 0,
         fail: row?.fail ?? 0,
         degraded: row?.degraded ?? 0,
