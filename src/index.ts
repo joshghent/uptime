@@ -123,7 +123,7 @@ export function createWorker(source: string) {
 <body style="font:14px/1.6 system-ui;max-width:60rem;margin:4rem auto;padding:0 1rem">
 <h1>status.yaml is invalid</h1>
 <ul>${list}</ul>
-<p>Fix it and redeploy. Run <code>pnpm lint:config</code> locally to catch this before pushing.</p>
+<p>Fix it and redeploy. Run <code>npm run lint</code> locally to catch this before pushing.</p>
 </body></html>`,
         500,
       );

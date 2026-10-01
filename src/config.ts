@@ -244,7 +244,7 @@ export class ConfigError extends Error {
 
 /**
  * Parse and validate the YAML config. Throws {@link ConfigError} with one
- * human-readable line per problem — this is what `pnpm lint:config` prints.
+ * human-readable line per problem — this is what `uptime lint` prints.
  */
 export function loadConfig(source: string, env: Record<string, unknown> = {}): Config {
   let doc: unknown;
