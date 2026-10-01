@@ -37,15 +37,15 @@
     "prepack": "node scripts/build.ts"
   },
   "dependencies": {
-    "wrangler": "4.119.0"
+    "wrangler": "4.143.0"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.20.2",
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
     "@types/node": "^26.1.2",
     "esbuild": "^0.28.1",
     "hono": "^4.13.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.10",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   }
