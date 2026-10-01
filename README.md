@@ -10,6 +10,11 @@ YAML file, checked by a cron, rendered as a single server-side page.
 Free on Cloudflare's free tier for a handful of monitors. No dashboard to click
 through, no per-monitor pricing, no vendor holding your incident history.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
+  <img alt="A status page with four monitors, 90-day uptime bars and an event history listing an incident and three days of slow responses" src="docs/screenshot-light.png">
+</picture>
+
 - HTTP/HTTPS checks with status, body and latency assertions
 - Heartbeat monitors: your cron pings *us*, and a missed ping is an incident
 - Alerts to [ntfy](https://ntfy.sh) and any webhook, globally or per monitor
