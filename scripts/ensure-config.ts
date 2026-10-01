@@ -1,21 +1,11 @@
-// Creates the files that are yours rather than upstream's, if they aren't
-// there yet: `status.yaml` and `.dev.vars`. Both start as copies of the
-// tracked `*.example` files, and both are left alone once they exist.
-//
-// Upstream does not track `status.yaml`, which is what makes updates painless
-// — a merge from upstream can never conflict with your monitors. The flip side
-// is that a fresh clone has no config at all, and `import "../status.yaml"`
-// would fail with a module-resolution error rather than saying so. This runs
-// first from `dev`, `test`, `lint:config` and `deploy`.
+// Creates `.dev.vars` from the template's example if it isn't there yet, so
+// `${VAR}` in template/status.yaml resolves for `wrangler dev` and the linter.
+// Left alone once it exists. Runs first from `dev`, `test` and `lint:config`.
 import { copyFileSync, existsSync } from "node:fs";
 
-const pairs = [
-  ["status.example.yaml", "status.yaml"],
-  [".dev.vars.example", ".dev.vars"],
-] as const;
+const [from, to] = ["template/.dev.vars.example", ".dev.vars"];
 
-for (const [from, to] of pairs) {
-  if (existsSync(to) || !existsSync(from)) continue;
+if (!existsSync(to)) {
   copyFileSync(from, to);
-  console.log(`created ${to} from ${from} — edit it, it is yours`);
+  console.log(`created ${to} from ${from}`);
 }

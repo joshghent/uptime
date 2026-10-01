@@ -1,11 +1,7 @@
 # Your status page, in one file.
 #
-#   cp status.example.yaml status.yaml   copy this once, then edit the copy
-#   pnpm lint:config                     check it
-#   pnpm run deploy                      publish the change
-#
-# `status.yaml` is yours: it is not tracked upstream, so pulling updates never
-# touches it. Commit it to your own fork — the deploy bundles it.
+#   npm run lint     check it
+#   git push         publish it — Cloudflare deploys what is on main
 #
 # Every `${VAR}` below is read from a Worker secret:
 #   npx wrangler secret put NTFY_URL
@@ -61,8 +57,8 @@ monitors:
     degraded_ms: 1500
 
   # Point one monitor at this status page's own /health. It returns 503 when
-  # the database has migrations left to apply, so an update you deployed but
-  # never migrated raises an incident instead of going unnoticed.
+  # an update could not bring the database up to date, so that raises an
+  # incident instead of going unnoticed.
   - name: Status page
     url: https://status.acme.com/health
     description: This page and its database

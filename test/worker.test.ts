@@ -4,7 +4,7 @@ import { loadConfig } from "../src/config.ts";
 import { createWorker } from "../src/index.ts";
 import { REPO } from "../src/page.ts";
 import { LATEST_MIGRATION, VERSION } from "../src/version.ts";
-import source from "../status.yaml";
+import source from "../template/status.yaml";
 
 // Asserted against your own status.yaml, so editing it cannot silently break
 // the page without a test noticing — on a fork as much as here.

@@ -4,7 +4,7 @@ import { migrationApplied } from "../src/db.ts";
 import { createWorker } from "../src/index.ts";
 import { MIGRATIONS, migrate, statements } from "../src/migrate.ts";
 import { LATEST_MIGRATION } from "../src/version.ts";
-import source from "../status.yaml";
+import source from "../template/status.yaml";
 
 // The Worker cannot list `migrations/` at runtime — the directory is not
 // bundled — so MIGRATIONS is written down by hand. This is what stops it from

@@ -4,12 +4,15 @@
 //
 //   uptime lint [status.yaml]    validate the config the way the Worker does
 //   uptime check                 lint, build, then boot the Worker and load it
+//   uptime init [dir]            start a new deployment from the template
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { parse as parseYaml } from "yaml";
 import { ConfigError, loadConfig, type Config } from "./config.ts";
 
 const CONFIG = "status.yaml";
@@ -47,9 +50,10 @@ function devVars(): Record<string, string> {
   return out;
 }
 
-/** Every `${VAR}` the file names, set or not. */
+/** Every `${VAR}` the file uses, set or not. Parsed, so comments don't count. */
 function referencedVars(source: string): string[] {
-  return [...new Set([...source.matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g)].map((m) => m[1]!))];
+  const text = JSON.stringify(parseYaml(source) ?? null);
+  return [...new Set([...text.matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g)].map((m) => m[1]!))];
 }
 
 /** Validates and prints the monitors, or prints every problem and exits. */
@@ -124,12 +128,12 @@ async function get(url: string): Promise<Response | undefined> {
  * migrations — and its page and /health loaded.
  *
  * Secrets are not needed to prove any of that, and CI does not have them, so
- * an unset `${VAR}` is filled with a placeholder rather than failing.
+ * an unset or empty `${VAR}` is filled with a placeholder rather than failing.
  */
 async function check() {
   const source = read(CONFIG);
   const env: Record<string, string | undefined> = { ...devVars(), ...process.env };
-  const placeholders = referencedVars(source).filter((n) => typeof env[n] !== "string");
+  const placeholders = referencedVars(source).filter((n) => !env[n]);
   for (const n of placeholders) env[n] = `https://placeholder.invalid/${n}`;
   if (placeholders.length) console.log(`using placeholders for unset ${placeholders.join(", ")}`);
   validate(CONFIG, source, env);
@@ -179,6 +183,30 @@ async function check() {
   console.log(`\nuptime ${VERSION} works with this ${CONFIG}`);
 }
 
+/**
+ * Copies the template into `dir`. npm will not publish a file called
+ * `.gitignore`, so the template carries it as `gitignore`.
+ */
+function init(dir = "uptime") {
+  if (existsSync(dir) && readdirSync(dir).length > 0) fail(`${dir} already exists and is not empty`);
+  const template = join(fileURLToPath(import.meta.url), "..", "..", "template");
+  cpSync(template, dir, { recursive: true });
+  renameSync(join(dir, "gitignore"), join(dir, ".gitignore"));
+
+  const pkgPath = join(dir, "package.json");
+  const pkg = JSON.parse(read(pkgPath));
+  pkg.dependencies["@joshghent/uptime"] = `^${VERSION}`;
+  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+
+  console.log(`created ${dir}. Next:
+
+  cd ${dir}
+  npm install
+  npx wrangler d1 create uptime     paste the database_id into wrangler.jsonc
+  # edit status.yaml, then push to a GitHub repository
+  # and connect it in Cloudflare: Workers & Pages > Create > Import a repository`);
+}
+
 const [command, ...args] = process.argv.slice(2);
 switch (command) {
   case "lint":
@@ -187,6 +215,9 @@ switch (command) {
   case "check":
     await check().catch((e: Error) => fail(e.message));
     break;
+  case "init":
+    init(args[0]);
+    break;
   default:
-    fail(`usage: uptime <lint [file] | check>`);
+    fail(`usage: uptime <lint [file] | check | init [dir]>`);
 }

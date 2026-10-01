@@ -26,6 +26,21 @@ jobs:
           HEARTBEAT_TOKEN: ci
       - run: pnpm test
 
+  # The package as a deployment gets it: packed, installed into a fresh copy of
+  # the template with npm, and run through that deployment's own check.
+  template:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test:template
+
   # Upstream only. status.yaml belongs to whoever runs the page: committing one
   # here would drop it into the merge path of every fork, which is the whole
   # thing this layout avoids.
