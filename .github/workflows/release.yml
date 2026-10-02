@@ -1,62 +1,75 @@
-# Publishes a release when a version tag is pushed: @joshghent/uptime and
-# create-uptime to npm, then a GitHub Release.
+# Releases are cut by release-please from conventional commit messages.
 #
-#   1. bump "version" in package.json, and in packages/create-uptime/package.json
-#      along with its pin on @joshghent/uptime
-#   2. add the section to CHANGELOG.md
-#   3. git tag v1.2.0 && git push --tags
+# Every push to main updates a "chore(main): release x.y.z" pull request that
+# bumps both packages and writes CHANGELOG.md from the commits since the last
+# release: `fix:` is a patch, `feat:` a minor, and `feat!:` or a
+# `BREAKING CHANGE:` footer a major. Merging that pull request tags the
+# release, creates the GitHub Release, and runs `publish` below.
 #
-# The tag has to agree with package.json, because that is what the running
-# Worker reports on /health and in the footer. A tag that disagreed would make
-# every deployment lie about which release it is.
+# Semver is a promise to deployments here: minor and patch releases merge into
+# every status page with nobody looking, and a major waits for a human. So
+# anything an operator has to do by hand is `!`, with what to do in the body.
 #
-# A tag like v2.0.0-rc.1 is a prerelease: it goes to npm under `next`, which
-# no deployment's Dependabot follows, and needs no CHANGELOG section.
-#
-# npm publishing uses trusted publishing (OIDC), so there is no npm token to
-# keep. Each package lists this repository and this workflow file as its
-# trusted publisher on npmjs.com.
+# Publishing lives in this file rather than a tag-triggered one because a tag
+# pushed with the built-in token does not trigger other workflows, and because
+# npm trusted publishing (OIDC, no npm token) names this file as the publisher
+# of both packages. For the same token reason the release pull request shows
+# no CI checks; `publish` runs them all before anything reaches npm.
 name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
 
 permissions:
   contents: write
+  pull-requests: write
   id-token: write
 
 jobs:
-  release:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v5
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
 
-      - name: Tag matches both packages
+      # create-uptime pins the package exactly. release-please bumps both, and
+      # this proves it did before either is published.
+      - name: Both packages are on one version
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME#v}"
-          for check in \
-            "package.json .version" \
-            "packages/create-uptime/package.json .version" \
-            "packages/create-uptime/package.json .dependencies[\"@joshghent/uptime\"]"; do
-            set -- $check
-            got="$(jq -r "$2" "$1")"
-            if [ "$tag" != "$got" ]; then
-              echo "::error::tag v$tag does not match $2 in $1 ($got)"
+          v="$(jq -r .version package.json)"
+          for got in \
+            "$(jq -r .version packages/create-uptime/package.json)" \
+            "$(jq -r '.dependencies["@joshghent/uptime"]' packages/create-uptime/package.json)"; do
+            if [ "$got" != "$v" ]; then
+              echo "::error::create-uptime says $got, the package is $v"
               exit 1
             fi
           done
 
-      # The same checks CI runs. A release that was never green is worse than a
-      # late one, and every deployment is about to be offered it.
       - run: pnpm typecheck
       - run: pnpm lint:config
         env:
@@ -65,27 +78,6 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - run: pnpm test:template
-
-      # Before anything is published, because a publish cannot be taken back.
-      - name: Release notes
-        run: |
-          set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          if [[ "$version" == *-* ]]; then
-            echo "Release candidate for ${version%%-*}. Not offered to deployments." > notes.md
-            exit 0
-          fi
-          notes="$(awk -v v="$version" '
-            $1 == "##" && $2 == v { found = 1; next }
-            found && $1 == "##" { exit }
-            found { print }
-          ' CHANGELOG.md)"
-
-          if [ -z "$(printf '%s' "$notes" | tr -d '[:space:]')" ]; then
-            echo "::error::CHANGELOG.md has no section for $version"
-            exit 1
-          fi
-          printf '%s\n' "$notes" > notes.md
 
       # Trusted publishing needs npm 11.5.1 or later; Node 22 ships npm 10.
       - run: npm install -g npm@^11.5.1
@@ -96,22 +88,11 @@ jobs:
       - name: Publish to npm
         run: |
           set -euo pipefail
-          tag=latest
-          [[ "$GITHUB_REF_NAME" == *-* ]] && tag=next
           for dir in . packages/create-uptime; do
             id="$(jq -r '.name + "@" + .version' "$dir/package.json")"
             if npm view "$id" version >/dev/null 2>&1; then
               echo "$id is already on npm"
               continue
             fi
-            (cd "$dir" && npm publish --access public --tag "$tag")
+            (cd "$dir" && npm publish --access public)
           done
-
-      - name: Publish the GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          prerelease=()
-          [[ "$GITHUB_REF_NAME" == *-* ]] && prerelease=(--prerelease)
-          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md "${prerelease[@]}"
