@@ -9,6 +9,11 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 3
+    # A conventional title, which release-please reads once it is squash-
+    # merged. hono, yaml and zod are bundled into every deployment's Worker
+    # and wrangler is what builds it, so a bump here is a patch release.
+    commit-message:
+      prefix: "fix(deps)"
     # pnpm refuses a package younger than a day, so a PR for a release that
     # came out this morning fails CI for no reason. Two days clears it.
     cooldown:
@@ -28,6 +33,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    commit-message:
+      prefix: "ci"
     groups:
       actions:
         patterns: ["*"]
