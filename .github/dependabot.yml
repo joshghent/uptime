@@ -9,9 +9,19 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 3
+    # pnpm refuses a package younger than a day, so a PR for a release that
+    # came out this morning fails CI for no reason. Two days clears it.
+    cooldown:
+      default-days: 2
     groups:
       npm:
         patterns: ["*"]
+    ignore:
+      # @cloudflare/vitest-pool-workers runs the tests inside workerd and
+      # supports vitest ^4.1 only; vitest 5 fails at load. Lift this when the
+      # pool's peer range takes 5.
+      - dependency-name: vitest
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
