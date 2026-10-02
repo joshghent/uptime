@@ -1,8 +1,9 @@
 # Changelog
 
-Every release has a section here, and the release workflow publishes it as the
-GitHub Release notes. **Action required** means an update needs something from
-you beyond merging.
+Every release has a section here, also published as its GitHub Release notes.
+From 2.2.0 release-please writes them from commit messages. A major lists what
+you have to do under **⚠ BREAKING CHANGES**; earlier entries call that
+**Action required**.
 
 Versions are semver against what an operator sees. Minor and patch releases
 merge into your status page by themselves once its check passes, so they never

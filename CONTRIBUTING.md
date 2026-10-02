@@ -84,22 +84,29 @@ required**.
 
 ## Releasing
 
-For maintainers:
+Releases are automated with [release-please](https://github.com/googleapis/release-please).
+Pull requests are squash-merged, and the title becomes the commit it reads, so
+titles follow [Conventional Commits](https://www.conventionalcommits.org) — a
+check enforces it:
 
-1. Bump `version` in `package.json`, and in `packages/create-uptime/package.json`
-   both its `version` and its pin on `@joshghent/uptime`.
-2. Add the section to `CHANGELOG.md`, headed `## <version> — <YYYY-MM-DD>`.
-3. `git tag v<version> && git push --tags`.
+| Title | Release |
+|---|---|
+| `fix: …` | patch |
+| `feat: …` | minor |
+| `feat!: …` | major |
+| `chore:`, `docs:`, `ci:`, `test:`, `refactor:` | none |
 
-The release workflow re-runs the checks, refuses a tag that disagrees with any
-of those three, publishes both packages to npm, and publishes the CHANGELOG
-section as the release notes. Every deployment's Dependabot then opens a pull
-request for it, and merges it if it is not a major.
+Every merge to `main` updates a release pull request that bumps both packages
+— `create-uptime` and its exact pin on `@joshghent/uptime` move together — and
+writes `CHANGELOG.md`. Merging it tags the release, publishes the GitHub
+Release, re-runs every check and publishes both packages to npm. Every
+deployment's Dependabot then opens a pull request for it, and merges it if it
+is not a major.
 
 So semver is a promise about deployments: a minor or patch must work with no
-one looking. Anything that needs a human is a major, with the steps under
-**Action required**. Tag `v<version>-rc.<n>` to publish a release candidate
-under npm's `next` tag, which deployments do not follow.
+one looking. Anything that needs a human is `feat!:` (or `fix!:`), with the
+steps written in the pull request body after `BREAKING CHANGE:` — that text
+becomes the release notes people read before they update.
 
 Upstream deploys nothing. The maintainer's own status page is a deployment of
 the package like everyone else's, which is also what keeps the update path
