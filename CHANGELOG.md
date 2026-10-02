@@ -10,6 +10,15 @@ merge into your status page by themselves once its check passes, so they never
 need a hand; migrations and changes to the shape of `status.yaml` are handled
 for you. A major waits for you, and says what to do.
 
+## [2.1.1](https://github.com/joshghent/uptime/compare/v2.1.0...v2.1.1) (2026-10-02)
+
+
+### Fixed
+
+* **deps:** bump the npm group with 6 updates ([#23](https://github.com/joshghent/uptime/issues/23)) ([9644f0f](https://github.com/joshghent/uptime/commit/9644f0f8108a582d4664a6dcedfbf635e9b94763))
+* **deps:** hold vitest at 4 and let releases settle before bumping ([f2792d6](https://github.com/joshghent/uptime/commit/f2792d6a134dec8a5b225139e91328460c46dbbe))
+* **deps:** hold vitest at 4 until the workers pool supports 5 ([fa89018](https://github.com/joshghent/uptime/commit/fa890188c11105753ce7f35f059b7588ce3a25e1))
+
 ## 2.1.0 — 2026-10-01
 
 No action required. This merges into your status page by itself.
