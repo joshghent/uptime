@@ -44,8 +44,8 @@
     "@types/node": "^26.1.2",
     "esbuild": "^0.28.1",
     "hono": "^4.13.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.10",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   }
