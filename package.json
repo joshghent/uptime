@@ -37,7 +37,7 @@
     "prepack": "node scripts/build.ts"
   },
   "dependencies": {
-    "wrangler": "4.145.0"
+    "wrangler": "4.147.0"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.22.0",
