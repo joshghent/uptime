@@ -1,6 +1,6 @@
 {
   "name": "create-uptime",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "npm create uptime — start a status page on Cloudflare Workers + D1",
   "license": "MIT",
   "repository": {
@@ -16,6 +16,6 @@
     "index.js"
   ],
   "dependencies": {
-    "@joshghent/uptime": "2.1.1"
+    "@joshghent/uptime": "2.1.2"
   }
 }
