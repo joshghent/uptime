@@ -6,6 +6,10 @@ overrides:
   # forever on size zero. Dev-only too, and dependabot cannot bump a transitive
   # pnpm dependency on its own.
   nanoid: "^3.3.18"
+  # The test pool's miniflare pins sharp 0.35.2, and postcss pins
+  # source-map-js 1.2.1. Both carry high advisories, and both are dev-only.
+  sharp: ">=0.35.5 <0.36.0"
+  source-map-js: ">=1.2.2 <2.0.0"
 
 # esbuild and workerd download platform binaries in a postinstall script.
 allowBuilds:
