@@ -10,6 +10,13 @@ merge into your status page by themselves once its check passes, so they never
 need a hand; migrations and changes to the shape of `status.yaml` are handled
 for you. A major waits for you, and says what to do.
 
+## [2.1.4](https://github.com/joshghent/uptime/compare/v2.1.3...v2.1.4) (2026-10-20)
+
+
+### Fixed
+
+* **deps:** bump the npm group with 2 updates ([#31](https://github.com/joshghent/uptime/issues/31)) ([ec2cba9](https://github.com/joshghent/uptime/commit/ec2cba9c75c4165e80b8249130e079d0c18094db))
+
 ## [2.1.3](https://github.com/joshghent/uptime/compare/v2.1.2...v2.1.3) (2026-10-16)
 
 
