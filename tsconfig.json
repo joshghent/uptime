@@ -6,7 +6,7 @@
     "lib": ["es2022"],
     // Worker runtime types come from worker-configuration.d.ts (`pnpm
     // cf-typegen`). Node's are for the linter script and the vitest config.
-    "types": ["@cloudflare/vitest-pool-workers/types", "node"],
+    "types": ["@cloudflare/vitest-plugin/types", "node"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,

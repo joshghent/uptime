@@ -39,12 +39,18 @@ describe("migrationApplied", () => {
 
 const TABLES = ["samples", "daily", "incidents", "heartbeats", "d1_migrations"];
 
-/** Tables and indexes, as SQLite records them. */
+/**
+ * Tables and indexes, as SQLite records them. SQLite stores the statement text
+ * verbatim, so `--` comments survive or not depending on who split the file:
+ * migrate() drops them, @cloudflare/vitest-plugin's applyD1Migrations keeps
+ * them. Compare without comments so the test checks the schema, not the
+ * splitter.
+ */
 async function schema(): Promise<string[]> {
   const { results } = await env.DB.prepare(
     `SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name != 'd1_migrations' ORDER BY name`,
   ).all<{ sql: string }>();
-  return results.map((r) => r.sql);
+  return results.map((r) => r.sql.replace(/--[^\n]*/g, "").replace(/[ \t]+$/gm, ""));
 }
 
 async function ledger(): Promise<string[]> {
